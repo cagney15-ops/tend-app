@@ -1,0 +1,24 @@
+{
+  "name": "Tend",
+  "short_name": "Tend",
+  "description": "A quiet place to keep the record of a hard family chapter.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#EDE6D6",
+  "theme_color": "#6B7F5A",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='44' fill='%236B7F5A'/%3E%3Cpath d='M96 152s-48-30-62-60A30 30 0 0 1 96 48a30 30 0 0 1 62 44c-14 30-62 60-62 60Z' fill='%23F7F2E7'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='116' fill='%236B7F5A'/%3E%3Cpath d='M256 404s-128-80-165-160A80 80 0 0 1 256 128a80 80 0 0 1 165 116c-37 80-165 160-165 160Z' fill='%23F7F2E7'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
