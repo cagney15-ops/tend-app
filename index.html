@@ -166,23 +166,40 @@ async function loadMoments(){
 /* ---------- screens ---------- */
 function brandRow(){return '<div class="brand"><div class="mark"><svg viewBox="0 0 24 24" width="16" height="16" fill="#F7F2E7" stroke="#F7F2E7" stroke-width="1.5">'+I.heart+'</svg></div><span class="name">tend</span><span class="tag">Kinship</span></div>';}
 
+let loginMode='password'; // 'password' | 'link'
 function renderLogin(){
   $('cfgBanner').innerHTML='';
+  const pw = loginMode==='password';
   root.innerHTML='<div class="center">'+brandRow()
     +'<p class="lead" style="text-align:center;margin:4px 0 22px">A quiet place to keep the record of a hard, important chapter.</p>'
     +'<div class="card"><h1 style="font-size:22px;margin:0 0 4px">Sign in</h1>'
-    +'<p class="lead tiny" style="margin:0">We\u2019ll email you a secure link \u2014 no password to remember.</p>'
+    +'<p class="lead tiny" style="margin:0">'+(pw?'Enter the email and password for your space.':'We\u2019ll email you a secure link \u2014 no password to remember.')+'</p>'
     +'<label class="fld"><span>Email</span><input id="email" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com"></label>'
-    +'<button class="btn btn-primary btn-block" style="margin-top:18px" id="sendLink">Email me a sign-in link</button>'
-    +'<div id="loginMsg"></div></div>'
+    +(pw?'<label class="fld"><span>Password</span><input id="password" type="password" autocomplete="current-password" placeholder="Your password"></label>':'')
+    +'<button class="btn btn-primary btn-block" style="margin-top:18px" id="goBtn">'+(pw?'Sign in':'Email me a sign-in link')+'</button>'
+    +'<div id="loginMsg"></div>'
+    +'<button class="btn btn-ghost btn-block" style="margin-top:10px" id="toggleMode">'+(pw?'Use an email link instead':'Use a password instead')+'</button>'
+    +'</div>'
     +'<p class="tiny faint" style="text-align:center;margin-top:18px;line-height:1.5">Your data is private to your family and protected at the database level.</p></div>';
-  $('sendLink').onclick=sendLink;
-  $('email').addEventListener('keydown',e=>{if(e.key==='Enter')sendLink();});
+  $('goBtn').onclick = pw ? passwordSignIn : sendLink;
+  $('toggleMode').onclick=()=>{ loginMode = pw?'link':'password'; renderLogin(); };
+  const onEnter=e=>{if(e.key==='Enter') (pw?passwordSignIn():sendLink());};
+  $('email').addEventListener('keydown',onEnter);
+  if($('password')) $('password').addEventListener('keydown',onEnter);
+}
+async function passwordSignIn(){
+  const email=($('email').value||'').trim();
+  const password=($('password')?$('password').value:'')||'';
+  if(!email || !password){ $('loginMsg').innerHTML='<div class="err">Enter your email and password.</div>'; return; }
+  const btn=$('goBtn'); btn.disabled=true; btn.textContent='Signing in\u2026';
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  btn.disabled=false; btn.textContent='Sign in';
+  if(error){ $('loginMsg').innerHTML='<div class="err">'+esc(error.message)+'</div>'; }
 }
 async function sendLink(){
   const email=($('email').value||'').trim();
   if(!email){ $('loginMsg').innerHTML='<div class="err">Enter your email first.</div>'; return; }
-  const btn=$('sendLink'); btn.disabled=true; btn.textContent='Sending\u2026';
+  const btn=$('goBtn'); btn.disabled=true; btn.textContent='Sending\u2026';
   const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.href.split('#')[0]}});
   btn.disabled=false; btn.textContent='Email me a sign-in link';
   if(error){ $('loginMsg').innerHTML='<div class="err">'+esc(error.message)+'</div>'; }
