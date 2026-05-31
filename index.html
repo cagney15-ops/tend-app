@@ -668,9 +668,10 @@ function contactCard(c){
 function apptCard(a){
   const k=APPT_KINDS[a.kind]||APPT_KINDS.other;const du=daysUntil(a.appt_date);
   const who=a.assigned_to?whoName(a.assigned_to).split(' ')[0]:null;
+  const withName=(a.provider_id&&(COL.providers.find(p=>p.id===a.provider_id)||{}).name)||(a.person_id&&(COL.people.find(p=>p.id===a.person_id)||{}).name)||null;
   return '<div class="card" style="opacity:'+(a.done?'.7':'1')+'">'
     +'<div class="row" data-action="open-appt" data-id="'+a.id+'" style="cursor:pointer"><div class="ad" style="width:40px;height:40px;border-radius:12px;background:'+k.c+'1f;color:'+k.c+'">'+ic(a.done?'check':k.i,18)+'</div>'
-    +'<div class="grow"><p style="font-weight:600;font-size:14.5px">'+esc(a.title||k.l)+'</p>'
+    +'<div class="grow"><p style="font-weight:600;font-size:14.5px">'+esc(a.title||k.l)+(withName?' <span class="faint" style="font-weight:500">with '+esc(withName)+'</span>':'')+'</p>'
     +'<p class="tiny muted" style="margin-top:3px">'+esc(fmtLong(a.appt_date))+(a.appt_time?' \u00b7 '+fmtTime(a.appt_time):'')+(a.location?' \u00b7 '+esc(a.location):'')+'</p>'
     +(who?'<p class="tiny" style="margin-top:5px;color:'+C.sageDeep+';font-weight:600"><span class="av sm" style="width:16px;height:16px;font-size:9px;display:inline-flex;vertical-align:middle;margin-right:5px;background:'+C.sage+'">'+initial(who)+'</span>'+esc(who)+'</p>':'')
     +'</div>'
@@ -1009,15 +1010,26 @@ function apptModal(a,prefillDate){
   h+='<label class="fld"><span>Title <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><input type="text" id="a_title" placeholder="e.g. Permanency hearing" value="'+esc(a?a.title:'')+'"></label>';
   h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Date</span><input type="date" id="a_date" value="'+(a?a.appt_date:(prefillDate||todayStr()))+'"></label><label class="fld grow"><span>Time</span><input type="time" id="a_time" value="'+(a?a.appt_time||'':'')+'"></label></div>';
   h+='<label class="fld"><span>Location</span><input type="text" id="a_loc" placeholder="Courtroom 2 / Bedford Children\u2019s\u2026" value="'+esc(a?a.location:'')+'"></label>';
+  // tag who this appointment is WITH (a provider and/or a case-team person)
+  const provsA=COL.providers.slice().sort((x,y)=>x.name.localeCompare(y.name));
+  const teamA=COL.people.filter(p=>p.kind==='caseteam').slice().sort((x,y)=>x.name.localeCompare(y.name));
+  if(provsA.length){
+    const prOpts=[['','\u2014 none \u2014']].concat(provsA.map(p=>[p.id,p.name+(p.specialty?' ('+p.specialty+')':'')]));
+    h+='<label class="fld"><span>With which provider <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><select id="a_provider">'+prOpts.map(o=>'<option value="'+esc(o[0])+'" '+((a&&a.provider_id===o[0])?'selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></label>';
+  } else { h+='<input type="hidden" id="a_provider" value="">'; }
+  if(teamA.length){
+    const peOpts=[['','\u2014 none \u2014']].concat(teamA.map(p=>[p.id,p.name+(p.role?' ('+p.role+')':'')]));
+    h+='<label class="fld"><span>With which case-team person <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><select id="a_caseperson">'+peOpts.map(o=>'<option value="'+esc(o[0])+'" '+((a&&a.person_id===o[0])?'selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></label>';
+  } else { h+='<input type="hidden" id="a_caseperson" value="">'; }
   const memOpts=[['','Unassigned']].concat(COL.members.map(mb=>[mb.user_id,whoName(mb.user_id).split(' ')[0]+(mb.user_id===session.user.id?' (you)':'')]));
-  h+='<label class="fld"><span>Who\u2019s responsible</span></label>'+picker('a_assigned',memOpts,a&&a.assigned_to?a.assigned_to:'');
-  h+='<label class="fld"><span>Who / notes</span><textarea id="a_notes" placeholder="Bring updated visit log; GAL attending\u2026">'+esc(a?a.notes:'')+'</textarea></label>';
+  h+='<label class="fld"><span>Who\u2019s responsible <span class="faint" style="text-transform:none;letter-spacing:0">(takes her)</span></span></label>'+picker('a_assigned',memOpts,a&&a.assigned_to?a.assigned_to:'');
+  h+='<label class="fld"><span>Notes</span><textarea id="a_notes" placeholder="Bring updated visit log; GAL attending\u2026">'+esc(a?a.notes:'')+'</textarea></label>';
   h+='<div class="togglerow"><span class="lab">Already happened</span><div class="switch '+(a&&a.done?'on':'')+'" data-action="toggle" id="a_done"><i></i></div></div>';
   h+='<div id="aErr"></div>'+actionsRow('save-appt',a?'del-appt':null);
   openSheet(h);bindPickers();
 }
 async function saveAppt(){
-  const o={kind:val('a_kind'),title:val('a_title'),appt_date:val('a_date')||todayStr(),appt_time:val('a_time')||null,location:val('a_loc'),notes:val('a_notes'),done:sw('a_done'),assigned_to:val('a_assigned')||null};
+  const o={kind:val('a_kind'),title:val('a_title'),appt_date:val('a_date')||todayStr(),appt_time:val('a_time')||null,location:val('a_loc'),notes:val('a_notes'),done:sw('a_done'),assigned_to:val('a_assigned')||null,provider_id:val('a_provider')||null,person_id:val('a_caseperson')||null};
   await saveRow('appointments',o,loadAppts);
 }
 
@@ -1079,11 +1091,16 @@ function providerDetail(p){
   const k=PROVIDER_KINDS[p.kind]||PROVIDER_KINDS.other;
   const meds=COL.medications.filter(m=>m.prescriber_id===p.id);
   const docs=COL.docs.filter(d=>d.provider_id===p.id);
+  const appts=COL.appts.filter(a=>a.provider_id===p.id).sort((x,y)=>(x.appt_date||'').localeCompare(y.appt_date||''));
   let h='<div class="dv-head"><div class="ad" style="width:48px;height:48px;border-radius:14px;background:'+C.terraSoft+';color:'+C.terra+'">'+ic(k.i,22)+'</div>'
     +'<div class="grow"><h2 style="margin:0">'+esc(p.name)+'</h2><p class="tiny faint" style="margin-top:3px">'+esc([k.l,p.specialty,p.org].filter(Boolean).join(' \u00b7 '))+'</p></div></div>';
   h+='<div class="dv-actions">'+(p.phone?'<a class="btn btn-soft grow" href="tel:'+esc(p.phone)+'">'+ic('phone',15)+'Call</a>':'')+'<button class="btn btn-ghost grow" data-action="edit-provider" data-id="'+p.id+'">'+ic('edit',15)+'Edit</button></div>';
   if(p.phone||p.address)h+='<div class="card" style="margin-top:4px">'+(p.phone?'<p class="tiny"><b>Phone</b> \u00b7 '+esc(p.phone)+'</p>':'')+(p.address?'<p class="tiny" style="margin-top:6px"><b>Address</b> \u00b7 '+esc(p.address)+'</p>':'')+'</div>';
   if(p.notes)h+='<div class="card" style="margin-top:10px"><p class="tiny" style="line-height:1.55">'+esc(p.notes)+'</p></div>';
+  // appointments with this provider
+  h+='<p class="section-label">Appointments'+(appts.length?' ('+appts.length+')':'')+'</p>';
+  if(!appts.length)h+='<p class="tiny faint" style="margin:0 0 6px">None scheduled. Tag this provider when adding an appointment.</p>';
+  else h+=appts.map(apptCard).join('');
   // linked medications
   h+='<p class="section-label">Medications prescribed'+(meds.length?' ('+meds.length+')':'')+'</p>';
   if(!meds.length)h+='<p class="tiny faint" style="margin:0 0 6px">None linked yet. Link a medication to this provider from the medication form.</p>';
@@ -1096,15 +1113,19 @@ function providerDetail(p){
 }
 function personDetail(p){
   if(!p)return;
-  const appts=COL.appts.filter(a=>a.assigned_to===p.id);  // (case-team people aren't household users, so this is rarely set; kept for completeness)
+  const appts=COL.appts.filter(a=>a.person_id===p.id||a.assigned_to===p.id).sort((x,y)=>(x.appt_date||'').localeCompare(y.appt_date||''));
   const contacts=COL.contacts.filter(c=>c.person_id===p.id);
   const docs=COL.docs.filter(d=>d.person_id===p.id);
   const col=p.color||C.gold;
   let h='<div class="dv-head"><span class="av" style="width:48px;height:48px;font-size:18px;background:'+col+'">'+initial(p.name)+'</span>'
     +'<div class="grow"><h2 style="margin:0">'+esc(p.name)+'</h2><p class="tiny faint" style="margin-top:3px">'+esc([p.role,p.org].filter(Boolean).join(' \u00b7 ')||(p.kind==='caseteam'?'Case team':'Family'))+'</p></div></div>';
   h+='<div class="dv-actions">'+(p.phone?'<a class="btn btn-soft grow" href="tel:'+esc(p.phone)+'">'+ic('phone',15)+'Call</a>':'')+(p.email?'<a class="btn btn-soft grow" href="mailto:'+esc(p.email)+'">'+ic('mail',15)+'Email</a>':'')+'<button class="btn btn-ghost grow" data-action="edit-person" data-id="'+p.id+'">'+ic('edit',15)+'Edit</button></div>';
+  // appointments tied to this person
+  h+='<p class="section-label">Appointments &amp; visits'+(appts.length?' ('+appts.length+')':'')+'</p>';
+  if(!appts.length)h+='<p class="tiny faint" style="margin:0 0 6px">None scheduled. Tag this person when adding an appointment.</p>';
+  else h+=appts.map(apptCard).join('');
   // contacts/visits linked to this person
-  h+='<p class="section-label">Visits &amp; contact'+(contacts.length?' ('+contacts.length+')':'')+'</p>';
+  h+='<p class="section-label">Contact log'+(contacts.length?' ('+contacts.length+')':'')+'</p>';
   if(!contacts.length)h+='<p class="tiny faint" style="margin:0 0 6px">None linked yet. When logging a visit or contact, link this person.</p>';
   else h+=contacts.map(contactCard).join('');
   // documents filed under them
