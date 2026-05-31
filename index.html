@@ -85,6 +85,16 @@
   .attach-strip.ro .attach-name{max-width:52px;}
   .dv-head{display:flex;align-items:center;gap:13px;margin-bottom:14px;}
   .dv-actions{display:flex;gap:8px;margin-bottom:14px;}
+  .hub{display:flex;align-items:center;gap:15px;background:var(--bone);border:1px solid var(--line);border-radius:20px;padding:16px;margin-top:6px;cursor:pointer;position:relative;}
+  .hub:active{transform:scale(.995);}
+  .hub-photo{width:72px;height:72px;border-radius:18px;object-fit:cover;flex-shrink:0;}
+  .hub-ph{display:flex;align-items:center;justify-content:center;background:var(--sage-soft);color:var(--sage-deep);}
+  .hub-info{flex:1;min-width:0;}
+  .hub-stats{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap;}
+  .hub-stats div{display:flex;flex-direction:column;}
+  .hub-stats b{font-family:var(--serif);font-size:17px;font-weight:600;color:var(--sage-deep);line-height:1.1;}
+  .hub-stats span{font-size:10.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;margin-top:2px;}
+  .hub-edit{position:absolute;top:14px;right:14px;}
   .icon-btn{width:36px;height:36px;border-radius:999px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
   .err{background:var(--terra-soft);color:var(--terra);border-radius:12px;padding:11px 13px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.45;}
   .ok{background:var(--sage-soft);color:var(--sage-deep);border-radius:12px;padding:11px 13px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.45;}
@@ -305,7 +315,7 @@ function parseAmount(s){s=(s||'').replace(/[^0-9.]/g,'');const v=parseFloat(s);r
 
 /* ---------- state ---------- */
 let sb=null, session=null, household=null, profiles={};
-let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[],providers:[],medications:[],expenses:[],attachments:[]};
+let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[],providers:[],medications:[],expenses:[],attachments:[],tasks:[]};
 let UI={tab:'today',ariaFilter:'all',caseSeg:'visits',healthSeg:'providers',calMonth:null};
 let draftAttach=[]; // [{tmpId,file_kind,file_name,mime,size_bytes,blob,previewUrl}]
 // Tier limits. Base plan: images + PDF, modest per-file cap. Premium: adds video/audio, larger cap.
@@ -364,13 +374,13 @@ async function route(){
 function hideNav(){ $('navbar').style.display='none'; }
 
 async function resolveHousehold(){
-  const {data,error}=await sb.from('memberships').select('role, households(id,label,child_first_name,invite_code)');
+  const {data,error}=await sb.from('memberships').select('role, households(id,label,child_first_name,invite_code,child_dob,placement_date,child_photo)');
   if(error) throw error;
   if(data&&data.length&&data[0].households) return data[0].households;
   return null;
 }
 async function loadAll(){
-  await Promise.all([loadProfiles(),loadMembers(),loadMoments(),loadContacts(),loadAppts(),loadDocs(),loadPeople(),loadProviders(),loadMeds(),loadExpenses(),loadAttachments()]);
+  await Promise.all([loadProfiles(),loadMembers(),loadMoments(),loadContacts(),loadAppts(),loadDocs(),loadPeople(),loadProviders(),loadMeds(),loadExpenses(),loadAttachments(),loadTasks()]);
   myRole=(COL.members.find(m=>m.user_id===session.user.id)||{}).role||null;
   await prepareSignedUrls();
 }
@@ -381,6 +391,7 @@ async function prepareSignedUrls(){
   COL.docs.forEach(d=>{if(isPath(d.file))paths.push(d.file);});
   COL.expenses.forEach(e=>{if(isPath(e.receipt))paths.push(e.receipt);});
   COL.attachments.forEach(at=>{if(isPath(at.storage_path))paths.push(at.storage_path);});
+  if(household&&isPath(household.child_photo))paths.push(household.child_photo);
   const need=[...new Set(paths)].filter(p=>!signedCache[p]);
   if(!need.length)return;
   try{
@@ -441,6 +452,10 @@ async function loadExpenses(){
 async function loadAttachments(){
   const {data,error}=await sb.from('attachments').select('*').eq('household_id',household.id).order('created_at',{ascending:true});
   if(error) throw error; COL.attachments=data||[];
+}
+async function loadTasks(){
+  const {data,error}=await sb.from('tasks').select('*').eq('household_id',household.id).order('done',{ascending:true}).order('due_date',{ascending:true,nullsFirst:false});
+  if(error) throw error; COL.tasks=data||[];
 }
 function attachmentsFor(type,id){ return COL.attachments.filter(a=>a.record_type===type&&a.record_id===id); }
 
@@ -516,6 +531,14 @@ async function joinHousehold(){
 
 /* ---------- app shell ---------- */
 function childName(){return (household&&household.child_first_name)||'your child';}
+function childStats(){
+  const out=[];
+  if(household&&household.placement_date){const d=daysSince(household.placement_date);if(d!=null){out.push({v:d===0?'Today':d+(d===1?' day':' days'),l:'in your care'});out.push({v:fmt(household.placement_date),l:'placed'});}}
+  if(household&&household.child_dob){const a=ageFrom(household.child_dob);if(a)out.push({v:a,l:'old'});}
+  return out;
+}
+function daysSince(ds){const d=parseD(ds);if(!d)return null;const t=new Date();t.setHours(0,0,0,0);d.setHours(0,0,0,0);return Math.round((t-d)/86400000);}
+function ageFrom(ds){const d=parseD(ds);if(!d)return '';const now=new Date();let y=now.getFullYear()-d.getFullYear();let m=now.getMonth()-d.getMonth();if(now.getDate()<d.getDate())m--;if(m<0){y--;m+=12;}if(y<=0)return (m||1)+(m===1?' mo':' mos');if(y<3)return y+'y '+(m>0?m+'m':'0m');return y+' yrs';}
 function meName(){return profiles[session.user.id]||(session.user.email||'You').split('@')[0];}
 function whoName(uid){return profiles[uid]||'Someone';}
 
@@ -555,12 +578,18 @@ function nextAppt(){
   return COL.appts.filter(a=>!a.done&&daysUntil(a.appt_date)!=null&&daysUntil(a.appt_date)>=0)
     .sort((a,b)=>((a.appt_date+(a.appt_time||''))).localeCompare(b.appt_date+(b.appt_time||'')))[0]||null;
 }
+function scheduleItems(){
+  return COL.appts.filter(a=>{const du=daysUntil(a.appt_date);return !a.done&&du!=null&&du>=0&&du<=10;})
+    .sort((x,y)=>(x.appt_date+'').localeCompare(y.appt_date+'')||((x.appt_time||'')+'').localeCompare((y.appt_time||'')+'')).slice(0,8);
+}
 function attentionItems(){
   const out=[];
   COL.appts.forEach(a=>{const du=daysUntil(a.appt_date);const k=APPT_KINDS[a.kind]||APPT_KINDS.other;if(!a.done&&du!=null&&du<0)out.push({sev:'over',icon:k.i,title:(a.title||k.l),sub:'Overdue \u00b7 '+fmt(a.appt_date),act:'open-appt',id:a.id});});
   COL.appts.forEach(a=>{const du=daysUntil(a.appt_date);const k=APPT_KINDS[a.kind]||APPT_KINDS.other;if(!a.done&&du!=null&&du>=0&&du<=7)out.push({sev:'soon',icon:k.i,title:(a.title||k.l),sub:(du===0?'Today':du===1?'Tomorrow':'In '+du+' days')+(a.appt_time?' \u00b7 '+fmtTime(a.appt_time):''),act:'open-appt',id:a.id});});
   COL.contacts.filter(c=>c.flagged).slice(0,3).forEach(c=>out.push({sev:'flag',icon:'alertT',title:'Flagged: '+(CONTACT_KINDS[c.kind]||'contact'),sub:fmt(c.occurred_on)+(c.with_whom?' \u00b7 '+c.with_whom:''),act:'open-contact',id:c.id}));
-  return out.slice(0,6);
+  COL.tasks.filter(t=>!t.done).forEach(t=>{const du=t.due_date?daysUntil(t.due_date):null;const over=du!=null&&du<0;const assignee=t.assigned_to?whoName(t.assigned_to).split(' ')[0]:null;
+    out.push({sev:over?'over':'soon',icon:'check',title:t.title,sub:(t.due_date?(over?'Overdue \u00b7 '+fmt(t.due_date):du===0?'Due today':du===1?'Due tomorrow':'Due '+fmt(t.due_date)):'Task')+(assignee?' \u00b7 '+assignee:''),act:'open-task',id:t.id});});
+  return out.slice(0,8);
 }
 function weekCounts(){
   const since=Date.now()-7*86400000;
@@ -596,11 +625,20 @@ function screenToday(){
       +'<span class="faint">'+ic('chevR',17)+'</span></div>';}).join('');
     h+='</div>';
   }
+  const sched=scheduleItems();
+  if(sched.length){
+    h+='<p class="section-label">Schedule \u00b7 next 10 days</p><div class="card">';
+    h+=sched.map(a=>{const k=APPT_KINDS[a.kind]||APPT_KINDS.other;const du=daysUntil(a.appt_date);const withName=(a.provider_id&&(COL.providers.find(p=>p.id===a.provider_id)||{}).name)||(a.person_id&&(COL.people.find(p=>p.id===a.person_id)||{}).name)||null;const who=a.assigned_to?whoName(a.assigned_to).split(' ')[0]:null;
+      return '<div class="att" data-action="open-appt" data-id="'+a.id+'"><div class="ad" style="background:'+k.c+'1f;color:'+k.c+'">'+ic(k.i,17)+'</div>'
+      +'<div class="grow"><p style="font-size:14px;font-weight:600">'+esc(a.title||k.l)+(withName?' <span class="faint" style="font-weight:500">\u00b7 '+esc(withName)+'</span>':'')+'</p><p class="tiny faint" style="margin-top:2px">'+(du===0?'Today':du===1?'Tomorrow':DOW[parseD(a.appt_date).getDay()]+' '+fmt(a.appt_date))+(a.appt_time?' \u00b7 '+fmtTime(a.appt_time):'')+(who?' \u00b7 '+who:'')+'</p></div>'
+      +'<span class="faint">'+ic('chevR',17)+'</span></div>';}).join('');
+    h+='</div>';
+  }
   h+='<p class="section-label">Quick add</p><div class="fab-row">'
     +quick('add-moment','book',C.sage,C.sageSoft,'Log a moment')
     +quick('add-contact','scale',C.terra,C.terraSoft,'Visit / contact')
     +quick('add-appt','cal',C.gold,'rgba(200,160,85,.18)','Appointment')
-    +quick('add-expense','receipt',C.sageDeep,C.sageSoft,'Log an expense')+'</div>';
+    +quick('add-task','check',C.sageDeep,C.sageSoft,'Add a task')+'</div>';
   h+='<button class="btn btn-ghost btn-block" style="margin-top:10px" data-action="open-add">'+ic('plus',17)+'Add something else</button>';
   const feed=activityFeed(8);
   h+='<p class="section-label">Recent activity</p>';
@@ -615,10 +653,21 @@ function quick(act,icon,col,bg,label){return '<div class="quick" data-action="'+
 /* ---------- CHILD (moments) ---------- */
 function screenChild(){
   const nm=childName();
-  let h='<p class="eyebrow">Her story, kept</p><h1 class="title">'+esc(nm)+'.</h1>';
+  const stats=childStats();
+  let h='<p class="eyebrow">Her story, kept</p>';
+  // hub header — photo + name + quick stats
+  h+='<div class="hub" data-action="edit-child">';
+  h+=(photoSrc(household.child_photo)?'<img class="hub-photo" src="'+photoSrc(household.child_photo)+'" alt="">':'<div class="hub-photo hub-ph">'+ic('heart',26)+'</div>');
+  h+='<div class="hub-info"><h1 class="title" style="margin:0">'+esc(nm)+'</h1>';
+  if(stats.length)h+='<div class="hub-stats">'+stats.map(s=>'<div><b>'+esc(s.v)+'</b><span>'+esc(s.l)+'</span></div>').join('')+'</div>';
+  else h+='<p class="tiny faint" style="margin-top:6px">Tap to add her photo, birthday &amp; placement date</p>';
+  h+='</div><span class="faint hub-edit">'+ic('edit',16)+'</span></div>';
+  // quick log from her page
+  h+='<div class="fab-row" style="margin-top:14px">'
+    +quick('add-moment','book',C.sage,C.sageSoft,'Log a moment')
+    +quick('add-appt','cal',C.gold,'rgba(200,160,85,.18)','Add an event')+'</div>';
   const filters=[['all','All'],['note','Notes'],['mood','Mood'],['milestone','Milestones'],['quote','Quotes'],['memory','Photos'],['health','Health']];
   h+='<div class="chips" style="margin-top:16px">'+filters.map(f=>'<button class="fchip '+(UI.ariaFilter===f[0]?'on':'')+'" data-action="aria-filter" data-f="'+f[0]+'">'+f[1]+'</button>').join('')+'</div>';
-  h+='<button class="btn btn-primary btn-block" style="margin-top:14px" data-action="add-moment">'+ic('plus',18)+'Log a moment</button>';
   let list=COL.moments.slice();
   if(UI.ariaFilter!=='all')list=list.filter(m=>m.type===UI.ariaFilter);
   if(!list.length){h+='<div class="empty" style="margin-top:18px"><div class="ic">'+ic('star',22)+'</div><h3>The memory archive starts here</h3><p>Notes, moods, milestones, the things she says, photos. The things no one else is writing down.</p><button class="btn btn-soft" data-action="add-moment">Add the first moment</button></div>';return h;}
@@ -755,6 +804,7 @@ function addChooser(){
     ['add-provider','cross',C.terra,C.terraSoft,'Provider','doctor, dentist, eye doctor, pharmacy'],
     ['add-med','pill',C.sageDeep,C.sageSoft,'Medication','prescription, eyeglasses, dosage'],
     ['add-expense','receipt',C.sageDeep,C.sageSoft,'Expense','money spent, for reimbursement or records'],
+    ['add-task','check',C.sage,C.sageSoft,'Task','a follow-up or to-do, assignable to anyone'],
     ['add-doc','file',C.sage,C.sageSoft,'Document','placement order, records, scans'],
     ['add-person','users',C.gold,'rgba(200,160,85,.18)','Person','case team or biological family']
   ];
@@ -1466,6 +1516,52 @@ async function disablePush(){
     renderTab();
   }catch(e){ alert('Could not turn off reminders: '+(e.message||e)); }
 }
+/* CHILD (hub edit) */
+function editChildModal(){
+  editId=null;setDraftFromExisting(household.child_photo);
+  let h='<h2>'+esc(childName())+'</h2><p class="glead">Her photo and a couple of dates power the stats on her page. All optional.</p>';
+  h+='<label class="fld"><span>First name</span><input type="text" id="ch_name" value="'+esc(household.child_first_name||'')+'"></label>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Date of birth</span><input type="date" id="ch_dob" value="'+(household.child_dob||'')+'"></label><label class="fld grow"><span>Placement date</span><input type="date" id="ch_place" value="'+(household.placement_date||'')+'"></label></div>';
+  h+='<div id="photoSlot">'+photoSlotHTML('Add her photo')+'</div>';
+  h+='<div id="chErr"></div><div class="sheet-actions"><button class="btn btn-ghost grow" data-action="close">Cancel</button><button class="btn btn-primary grow" data-action="save-child">Save</button></div>';
+  openSheet(h);
+}
+async function saveChild(){
+  let photo;try{photo=await uploadDraftPhoto();}catch(e){$('chErr').innerHTML='<div class="err">Photo upload failed: '+esc(e.message||'')+'</div>';return;}
+  const name=val('ch_name')||household.child_first_name;
+  try{
+    const {error}=await sb.from('households').update({child_first_name:name,child_dob:val('ch_dob')||null,placement_date:val('ch_place')||null,child_photo:photo}).eq('id',household.id);
+    if(error)throw error;
+    household.child_first_name=name;household.child_dob=val('ch_dob')||null;household.placement_date=val('ch_place')||null;household.child_photo=photo;
+    closeSheet();await prepareSignedUrls();renderApp();
+  }catch(e){const b=$('chErr');if(b)b.innerHTML='<div class="err">'+esc(e.message||'Could not save.')+'</div>';}
+}
+
+/* TASKS */
+function taskModal(t){
+  editId=t?t.id:null;
+  const memOpts=[['','Anyone']].concat(COL.members.map(mb=>[mb.user_id,whoName(mb.user_id).split(' ')[0]+(mb.user_id===session.user.id?' (you)':'')]));
+  let h='<h2>'+(t?'Edit task':'Add a task')+'</h2><p class="glead">A follow-up or to-do. Assign it to someone in the space, or leave it for anyone.</p>';
+  h+='<label class="fld"><span>Task</span><input type="text" id="t_title" placeholder="e.g. Send school the placement order" value="'+esc(t?t.title:'')+'"></label>';
+  h+='<label class="fld"><span>Assign to</span></label>'+picker('t_assigned',memOpts,t&&t.assigned_to?t.assigned_to:'');
+  h+='<label class="fld"><span>Due date <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><input type="date" id="t_due" value="'+(t?t.due_date||'':'')+'"></label>';
+  h+='<label class="fld"><span>Notes</span><textarea id="t_notes" placeholder="Any detail\u2026">'+esc(t?t.notes:'')+'</textarea></label>';
+  if(t)h+='<div class="togglerow"><span class="lab">Done</span><div class="switch '+(t.done?'on':'')+'" data-action="toggle" id="t_done"><i></i></div></div>';
+  h+='<div id="tErr"></div>'+actionsRow('save-task',t?'del-task':null);
+  openSheet(h);bindPickers();
+}
+async function saveTask(){
+  const title=val('t_title');if(!title){$('tErr').innerHTML='<div class="err">Add a few words for the task.</div>';return;}
+  const wasDone=editId?((COL.tasks.find(x=>x.id===editId)||{}).done):false;
+  const done=editId?sw('t_done'):false;
+  const o={title,assigned_to:val('t_assigned')||null,due_date:val('t_due')||null,notes:val('t_notes'),done,done_at:(done&&!wasDone)?new Date().toISOString():(done?undefined:null)};
+  await saveRow('tasks',o,loadTasks);
+}
+async function toggleTaskDone(id){
+  const t=COL.tasks.find(x=>x.id===id);if(!t)return;
+  try{await sb.from('tasks').update({done:!t.done,done_at:!t.done?new Date().toISOString():null}).eq('id',id);await loadTasks();renderTab();}catch(e){alert(e.message||'Could not update.');}
+}
+
 async function signOut(){if(pollTimer)clearInterval(pollTimer);await sb.auth.signOut();household=null;profiles={};COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[]};session=null;hideNav();renderLogin();}
 
 function renderError(msg){
@@ -1525,6 +1621,13 @@ document.addEventListener('click',e=>{
     case 'save-expense':saveExpense();break;
     case 'del-expense':delRow('expenses',loadExpenses);break;
     case 'expense-report':expenseReport();break;
+    case 'add-task':taskModal(null);break;
+    case 'open-task':taskModal(find(COL.tasks));break;
+    case 'save-task':saveTask();break;
+    case 'del-task':delRow('tasks',loadTasks);break;
+    case 'toggle-task':toggleTaskDone(id);break;
+    case 'edit-child':editChildModal();break;
+    case 'save-child':saveChild();break;
     case 'open-packet':packetModal();break;
     case 'gen-packet':genPacket();break;
     case 'close-packet':$('packetView').style.display='none';$('packetView').innerHTML='';break;
