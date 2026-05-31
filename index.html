@@ -626,6 +626,7 @@ function contactCard(c){
     +'<div class="grow"><div class="row" style="gap:8px"><p style="font-weight:600;font-size:14.5px">'+esc(CONTACT_KINDS[c.kind]||'Contact')+'</p>'+(c.flagged?'<span class="flagchip">'+ic('alertT',11)+'Flag</span>':'')+'</div>'
     +'<p class="tiny muted" style="margin-top:3px">'+esc(fmtLong(c.occurred_on))+(c.occurred_time?' \u00b7 '+fmtTime(c.occurred_time):'')+(c.with_whom?' \u00b7 '+esc(c.with_whom):'')+(c.supervised?' \u00b7 supervised':'')+'</p>'
     +(c.what_happened?'<p class="tiny" style="margin-top:7px;line-height:1.5;color:'+C.ink+'">'+esc(oneLine(c.what_happened))+'</p>':'')
+    +(c.flagged&&c.concern_note?'<p class="tiny" style="margin-top:6px;line-height:1.5;color:'+C.terra+'"><b>Concern:</b> '+esc(oneLine(c.concern_note))+'</p>':'')
     +((c.behavior_before||c.behavior_after)?'<div class="tiny faint" style="margin-top:6px;display:flex;gap:14px;flex-wrap:wrap">'+(c.behavior_before?'<span>Before: '+esc(oneLine(c.behavior_before)).slice(0,30)+'</span>':'')+(c.behavior_after?'<span>After: '+esc(oneLine(c.behavior_after)).slice(0,30)+'</span>':'')+'</div>':'')
     +'</div></div></div>';
 }
@@ -846,7 +847,7 @@ function calDayModal(ds){
     return '<div class="att" data-action="open-appt" data-id="'+a.id+'"><div class="ad" style="width:34px;height:34px;border-radius:11px;background:'+k.c+'1f;color:'+k.c+'">'+ic(k.i,16)+'</div>'
     +'<div class="grow"><p style="font-size:14px;font-weight:600">'+esc(a.title||k.l)+'</p><p class="tiny faint" style="margin-top:2px">'+(a.appt_time?fmtTime(a.appt_time):'All day')+(a.location?' \u00b7 '+esc(a.location):'')+(who?' \u00b7 '+esc(who):'')+'</p></div>'
     +'<button class="btn btn-ghost btn-sm" data-action="ics-appt" data-id="'+a.id+'">'+ic('dl',14)+'</button></div>';}).join('')+'</div>';}
-  h+='<div class="sheet-actions"><button class="btn btn-ghost grow" data-action="close">Close</button><button class="btn btn-primary grow" data-action="add-appt">Add appointment</button></div>';
+  h+='<div class="sheet-actions"><button class="btn btn-ghost grow" data-action="close">Close</button><button class="btn btn-primary grow" data-action="add-appt-on" data-d="'+esc(ds)+'">Add appointment</button></div>';
   openSheet(h);
 }
 function pad2(n){return String(n).padStart(2,'0');}
@@ -939,30 +940,37 @@ function contactModal(c){
   const opts=[['visit','Supervised visit'],['call','Phone call'],['text','Text/message'],['inperson','In-person'],['other','Other']];
   let h='<h2>'+(c?'Edit contact':'Log a visit or contact')+'</h2><p class="glead">Biological-family contact. The record courts rarely hear from you.</p>';
   h+='<label class="fld"><span>Type</span></label>'+picker('c_kind',opts,cur);
+  // person link (optional) — pick from existing people, prefills "with whom"
+  const ppl=COL.people.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  if(ppl.length){
+    const pOpts=[['','\u2014 choose someone \u2014']].concat(ppl.map(p=>[p.id,p.name+(p.role?' ('+p.role+')':'')]));
+    h+='<label class="fld"><span>Link a person <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><select id="c_person" data-action="contact-person">'+pOpts.map(o=>'<option value="'+esc(o[0])+'" '+((c&&c.person_id===o[0])?'selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></label>';
+  } else { h+='<input type="hidden" id="c_person" value="">'; }
   h+='<label class="fld"><span>With whom</span><input type="text" id="c_with" placeholder="e.g. biological mother" value="'+esc(c?c.with_whom:'')+'"></label>';
   h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Date</span><input type="date" id="c_date" value="'+(c?c.occurred_on:todayStr())+'"></label><label class="fld grow"><span>Time</span><input type="time" id="c_time" value="'+(c?c.occurred_time||'':'')+'"></label></div>';
   h+='<div class="togglerow"><span class="lab">Supervised</span><div class="switch '+((c?c.supervised:true)?'on':'')+'" data-action="toggle" id="c_sup"><i></i></div></div>';
   h+='<label class="fld"><span>Her behaviour before</span><textarea id="c_before" placeholder="Calm, a little anxious in the car\u2026">'+esc(c?c.behavior_before:'')+'</textarea></label>';
   h+='<label class="fld"><span>Her behaviour after</span><textarea id="c_after" placeholder="Clingy at bedtime, woke twice\u2026">'+esc(c?c.behavior_after:'')+'</textarea></label>';
   h+='<label class="fld"><span>What happened</span><textarea id="c_what" placeholder="Visit ran 45 min, warm goodbye\u2026">'+esc(c?c.what_happened:'')+'</textarea></label>';
-  h+='<div class="togglerow" style="background:'+C.terraSoft+';border-color:transparent"><span class="lab" style="color:'+C.terra+'">Flag a concern</span><div class="switch '+(c&&c.flagged?'on':'')+'" data-action="toggle" id="c_flag"><i></i></div></div>';
+  h+='<div class="togglerow" style="background:'+C.terraSoft+';border-color:transparent"><span class="lab" style="color:'+C.terra+'">Flag a concern</span><div class="switch '+(c&&c.flagged?'on':'')+'" data-action="toggle-concern" id="c_flag"><i></i></div></div>';
+  h+='<div id="concernWrap" style="display:'+(c&&c.flagged?'block':'none')+'"><label class="fld"><span>What\u2019s the concern?</span><textarea id="c_concern" placeholder="Briefly, what felt off \u2014 so it\u2019s captured in your words\u2026">'+esc(c?c.concern_note:'')+'</textarea></label></div>';
   h+='<div id="cErr"></div>'+actionsRow('save-contact',c?'del-contact':null);
   openSheet(h);bindPickers();
 }
 async function saveContact(){
-  const o={kind:val('c_kind'),with_whom:val('c_with'),occurred_on:val('c_date')||todayStr(),occurred_time:val('c_time')||null,supervised:sw('c_sup'),behavior_before:val('c_before'),behavior_after:val('c_after'),what_happened:val('c_what'),flagged:sw('c_flag')};
+  const o={kind:val('c_kind'),with_whom:val('c_with'),person_id:val('c_person')||null,occurred_on:val('c_date')||todayStr(),occurred_time:val('c_time')||null,supervised:sw('c_sup'),behavior_before:val('c_before'),behavior_after:val('c_after'),what_happened:val('c_what'),flagged:sw('c_flag'),concern_note:sw('c_flag')?val('c_concern'):null};
   if(!o.what_happened&&!o.behavior_before&&!o.behavior_after&&!o.with_whom){$('cErr').innerHTML='<div class="err">Add at least a note or who it was with.</div>';return;}
   await saveRow('contacts',o,loadContacts);
 }
 
 /* APPT */
-function apptModal(a){
+function apptModal(a,prefillDate){
   editId=a?a.id:null;const cur=a?a.kind:'hearing';
   const opts=Object.keys(APPT_KINDS).map(k=>[k,APPT_KINDS[k].l]);
   let h='<h2>'+(a?'Edit appointment':'Add appointment')+'</h2><p class="glead">Hearings, therapy, caseworker visits, medical.</p>';
   h+='<label class="fld"><span>Type</span></label>'+picker('a_kind',opts,cur);
   h+='<label class="fld"><span>Title <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><input type="text" id="a_title" placeholder="e.g. Permanency hearing" value="'+esc(a?a.title:'')+'"></label>';
-  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Date</span><input type="date" id="a_date" value="'+(a?a.appt_date:todayStr())+'"></label><label class="fld grow"><span>Time</span><input type="time" id="a_time" value="'+(a?a.appt_time||'':'')+'"></label></div>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Date</span><input type="date" id="a_date" value="'+(a?a.appt_date:(prefillDate||todayStr()))+'"></label><label class="fld grow"><span>Time</span><input type="time" id="a_time" value="'+(a?a.appt_time||'':'')+'"></label></div>';
   h+='<label class="fld"><span>Location</span><input type="text" id="a_loc" placeholder="Courtroom 2 / Bedford Children\u2019s\u2026" value="'+esc(a?a.location:'')+'"></label>';
   const memOpts=[['','Unassigned']].concat(COL.members.map(mb=>[mb.user_id,whoName(mb.user_id).split(' ')[0]+(mb.user_id===session.user.id?' (you)':'')]));
   h+='<label class="fld"><span>Who\u2019s responsible</span></label>'+picker('a_assigned',memOpts,a&&a.assigned_to?a.assigned_to:'');
@@ -1132,7 +1140,7 @@ function genPacket(){
   let p='<div class="pk-noprint" style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-ghost" data-action="close-packet">Close</button><button class="btn btn-primary" data-action="print-packet">'+ic('file',16)+'Print / Save PDF</button></div>';
   p+='<div class="pk-h"><h1 style="font-family:var(--serif);font-size:24px;font-weight:600;margin:0">Family record \u2014 '+esc(nm)+'</h1><p class="tiny muted" style="margin:6px 0 0">Period: '+esc(fmtLong(from))+' \u2013 '+esc(fmtLong(to))+' \u00b7 Compiled '+esc(fmtLong(todayStr()))+' by '+esc(meName())+'</p></div>';
   p+=pkSec('Hearings & appointments',appts.map(a=>{const k=APPT_KINDS[a.kind]||APPT_KINDS.other;return pkItem(fmt(a.appt_date)+(a.appt_time?' '+fmtTime(a.appt_time):''),(a.title||k.l)+(a.location?' \u00b7 '+esc(a.location):'')+(a.notes?'<br>'+esc(a.notes):''));}));
-  p+=pkSec('Visits & biological-family contact',contacts.map(c=>{let b=(CONTACT_KINDS[c.kind]||'Contact')+(c.with_whom?' with '+esc(c.with_whom):'')+(c.supervised?' (supervised)':'');if(c.what_happened)b+='<br>'+esc(c.what_happened);if(c.behavior_before)b+='<br><span class="d">Before:</span> '+esc(c.behavior_before);if(c.behavior_after)b+='<br><span class="d">After:</span> '+esc(c.behavior_after);if(c.flagged)b+='<br><b style="color:'+C.terra+'">\u26a0 Flagged concern</b>';return pkItem(fmt(c.occurred_on)+(c.occurred_time?' '+fmtTime(c.occurred_time):''),b);}));
+  p+=pkSec('Visits & biological-family contact',contacts.map(c=>{let b=(CONTACT_KINDS[c.kind]||'Contact')+(c.with_whom?' with '+esc(c.with_whom):'')+(c.supervised?' (supervised)':'');if(c.what_happened)b+='<br>'+esc(c.what_happened);if(c.behavior_before)b+='<br><span class="d">Before:</span> '+esc(c.behavior_before);if(c.behavior_after)b+='<br><span class="d">After:</span> '+esc(c.behavior_after);if(c.flagged)b+='<br><b style="color:'+C.terra+'">\u26a0 Flagged concern</b>'+(c.concern_note?': '+esc(c.concern_note):'');return pkItem(fmt(c.occurred_on)+(c.occurred_time?' '+fmtTime(c.occurred_time):''),b);}));
   p+=pkSec('Daily observations & milestones',moments.map(m=>{const t=TYPES[m.type]||TYPES.note;return pkItem(fmt(m.occurred_on),'<b>'+t.l+(m.mood?' \u00b7 '+esc(m.mood):'')+'</b> '+esc(m.body||''));}));
   if(docs.length)p+=pkSec('Documents added',docs.map(d=>pkItem(d.doc_date?fmt(d.doc_date):'\u2014','<b>'+esc(d.name)+'</b> \u00b7 '+esc(d.category||'')+(d.holder?' \u00b7 held by '+esc(d.holder):''))));
   if(!(appts.length+contacts.length+moments.length))p+='<p class="muted" style="margin-top:22px">No entries logged in this period yet.</p>';
@@ -1278,6 +1286,7 @@ document.addEventListener('click',e=>{
     case 'save-contact':saveContact();break;
     case 'del-contact':delRow('contacts',loadContacts);break;
     case 'add-appt':apptModal(null);break;
+    case 'add-appt-on':apptModal(null,t.getAttribute('data-d'));break;
     case 'open-appt':apptModal(find(COL.appts));break;
     case 'save-appt':saveAppt();break;
     case 'del-appt':delRow('appointments',loadAppts);break;
@@ -1309,6 +1318,7 @@ document.addEventListener('click',e=>{
     case 'pick-photo':pickPhoto();break;
     case 'rm-photo':draftPhotoPreview=null;draftPhotoBlob=null;draftPhotoKept=null;{const s=$('photoSlot');if(s)s.innerHTML=photoSlotHTML();}break;
     case 'toggle':t.classList.toggle('on');break;
+    case 'toggle-concern':{t.classList.toggle('on');const w=$('concernWrap');if(w)w.style.display=t.classList.contains('on')?'block':'none';break;}
     case 'copy-code':copyCode();break;
     case 'regen-code':regenCode();break;
     case 'manage-member':manageMemberModal(id);break;
@@ -1319,6 +1329,15 @@ document.addEventListener('click',e=>{
     case 'push-off':disablePush();break;
     case 'signout':signOut();break;
     case 'close':closeSheet();break;
+  }
+});
+
+document.addEventListener('change',e=>{
+  const el=e.target;
+  if(el&&el.id==='c_person'){
+    const p=COL.people.find(x=>x.id===el.value);
+    const w=$('c_with');
+    if(p&&w&&!w.value.trim()) w.value=p.name;
   }
 });
 
