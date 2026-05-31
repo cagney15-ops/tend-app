@@ -57,6 +57,7 @@
   .btn-terra{background:var(--terra-soft);color:var(--terra);}
   .btn-ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--line-mid);}
   .btn-block{width:100%;}
+  .btn-sm{padding:8px 13px;font-size:13px;border-radius:11px;}
   .icon-btn{width:36px;height:36px;border-radius:999px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
   .err{background:var(--terra-soft);color:var(--terra);border-radius:12px;padding:11px 13px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.45;}
   .ok{background:var(--sage-soft);color:var(--sage-deep);border-radius:12px;padding:11px 13px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.45;}
@@ -70,6 +71,14 @@
   header .spacer{flex:1;}
   .chip{font-size:12px;font-weight:600;border:1px solid var(--line-mid);background:var(--bone);color:var(--ink-soft);
     border-radius:999px;padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+  .chip-add{background:var(--sage);color:var(--bone);border-color:var(--sage);}
+  .chooser{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+  .choice{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--cream);border:1px solid var(--line-mid);border-radius:16px;padding:13px 15px;cursor:pointer;font-family:var(--sans);transition:transform .07s,border-color .15s,background .15s;}
+  .choice:active{transform:scale(.985);} .choice:hover{border-color:var(--sage);background:var(--bone);}
+  .choice .ci{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .choice .ct{display:flex;flex-direction:column;gap:2px;}
+  .choice .ct b{font-size:15px;font-weight:600;color:var(--ink);}
+  .choice .ct small{font-size:12.5px;color:var(--ink-faint);}
   .av{width:24px;height:24px;border-radius:999px;background:var(--sage);color:var(--bone);font-family:var(--serif);
     font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .av.lg{width:38px;height:38px;font-size:15px;}
@@ -179,6 +188,9 @@
    ============================================================ */
 const SUPABASE_URL  = "https://mkwthdcpafpmxwpdgbov.supabase.co";
 const SUPABASE_ANON = "sb_publishable_O4tCND6tdSJcppYZWBZ4NA_7nn7fhHI";
+// For reminder notifications (optional — added during the push-notifications setup).
+// Leave as-is until you generate VAPID keys; the app works fine without it.
+const VAPID_PUBLIC  = "PASTE_YOUR_VAPID_PUBLIC_KEY_HERE";
 
 /* ---------- icons ---------- */
 const I = {
@@ -214,6 +226,13 @@ const I = {
   spark:'<path d="m12 4 1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6Z"/>',
   refresh:'<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v5h-5"/>',
   x:'<path d="M6 6l12 12M18 6 6 18"/>',
+  pill:'<path d="M10.5 3.5a4.95 4.95 0 0 1 7 7l-7 7a4.95 4.95 0 0 1-7-7Z"/><path d="m8 8 8 8"/>',
+  glasses:'<circle cx="6" cy="15" r="3.2"/><circle cx="18" cy="15" r="3.2"/><path d="M9.2 14c.8-1.5 4.8-1.5 5.6 0"/><path d="M3 11l2-4h2M21 11l-2-4h-2"/>',
+  tooth:'<path d="M8 4c-2 0-3.5 1.5-3.5 4 0 1.5.5 3 1 5s.5 6 2 6 1.2-3 2.5-3 1 3 2.5 3 1.5-4 2-6 1-3.5 1-5c0-2.5-1.5-4-3.5-4-1.5 0-1.8 1-2.5 1S9.5 4 8 4Z"/>',
+  cross:'<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6Z"/>',
+  receipt:'<path d="M5 3v18l2-1.2L9 21l2-1.2L13 21l2-1.2L17 21l2-1.2V3l-2 1.2L15 3l-2 1.2L11 3 9 4.2 7 3Z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  dollar:'<path d="M12 2v20"/><path d="M17 6.5C17 4.6 14.8 3.5 12 3.5S7 4.8 7 7s2.5 3 5 3.5 5 1.2 5 3.5-2.2 3.5-5 3.5S7 19.4 7 17.5"/>',
+  wallet:'<path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2H3Z"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2H3"/><circle cx="17" cy="13" r="1.3"/>',
 };
 function ic(n,s,sw){s=s||18;sw=sw||1.8;return '<svg viewBox="0 0 24 24" width="'+s+'" height="'+s+'" fill="none" stroke="currentColor" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round">'+(I[n]||'')+'</svg>';}
 
@@ -244,23 +263,44 @@ const CONTACT_KINDS={visit:'Supervised visit',call:'Phone call',text:'Text / mes
 const APPT_KINDS={hearing:{l:'Court hearing',i:'gavel',c:C.terra},therapy:{l:'Therapy',i:'heart',c:C.sage},medical:{l:'Medical',i:'pulse',c:C.terra},caseworker:{l:'Caseworker visit',i:'shield',c:C.sage},visit:{l:'Family visit',i:'users',c:C.gold},school:{l:'School',i:'school',c:C.gold},other:{l:'Other',i:'cal',c:C.inkSoft}};
 const DOC_CATS=['Placement / custody order','Court order','Case plan','Visitation order','IEP / 504 plan','Immunization records','Birth certificate','Social Security card','Insurance / Medicaid','Medical record','Therapy notes','School records','Background / home study','Financial / benefits','Photo of document','Other'];
 const COMMON_DOCS=['Placement / custody order','Case plan','Immunization records','Birth certificate','Insurance / Medicaid'];
+const PROVIDER_KINDS={doctor:{l:'Doctor',i:'cross'},dentist:{l:'Dentist',i:'tooth'},optometrist:{l:'Eye doctor',i:'glasses'},therapist:{l:'Therapist',i:'heart'},pharmacy:{l:'Pharmacy',i:'pill'},specialist:{l:'Specialist',i:'cross'},other:{l:'Other',i:'cross'}};
+const MED_KINDS={medication:{l:'Medication',i:'pill'},eyeglasses:{l:'Eyeglasses',i:'glasses'},device:{l:'Device',i:'pulse'},other:{l:'Other',i:'pill'}};
+const EXP_CATS=['Clothing','Medical','School','Food','Activities','Travel','Childcare','Other'];
+const EXP_STATUS={logged:{l:'Logged',c:C.inkSoft,bg:C.cream},submitted:{l:'Submitted',c:C.gold,bg:'rgba(200,160,85,.18)'},reimbursed:{l:'Reimbursed',c:C.sageDeep,bg:C.sageSoft}};
+function dollars(cents){return '$'+(Math.round(cents||0)/100).toFixed(2);}
+function parseAmount(s){s=(s||'').replace(/[^0-9.]/g,'');const v=parseFloat(s);return isNaN(v)?0:Math.round(v*100);}
 
 /* ---------- state ---------- */
 let sb=null, session=null, household=null, profiles={};
-let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[]};
-let UI={tab:'today',ariaFilter:'all',caseSeg:'visits'};
-let draftPhoto=null, editId=null, modalOpen=false, pollTimer=null;
+let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[],providers:[],medications:[],expenses:[]};
+let UI={tab:'today',ariaFilter:'all',caseSeg:'visits',healthSeg:'providers'};
+let editId=null, modalOpen=false, pollTimer=null;
+let signedCache={}, myRole=null;
+let draftPhotoPreview=null, draftPhotoBlob=null, draftPhotoKept=null;
+function uid(){try{if(crypto&&crypto.randomUUID)return crypto.randomUUID();}catch(e){}return 'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
 const $=id=>document.getElementById(id);
 const root=$('root');
 
 /* ---------- boot ---------- */
 function boot(){
   if(!SUPABASE_URL || !SUPABASE_ANON || SUPABASE_ANON==='PASTE_YOUR_ANON_KEY_HERE'){
-    $('cfgBanner').innerHTML='<div class="banner">Almost there \u2014 open <code>index.html</code> and paste your Supabase <code>anon key</code> into the CONFIG block near the top.</div>';
-    root.innerHTML=''; return;
+    $('cfgBanner').innerHTML='';
+    root.innerHTML='<div class="center">'
+      +'<div class="brand"><div class="mark"><svg viewBox="0 0 24 24" width="16" height="16" fill="#F7F2E7" stroke="#F7F2E7" stroke-width="1.5"><path d="M12 21s-7-4.5-9.5-9A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9Z"/></svg></div><span class="name">tend</span></div>'
+      +'<div class="card" style="margin-top:18px"><h1 style="font-size:20px;margin:0 0 8px">One step left</h1>'
+      +'<p class="lead" style="font-size:14px;margin:0 0 12px">This copy of Tend doesn\u2019t have its Supabase key yet. Open <b>index.html</b> in a text editor, find the line near the top that reads:</p>'
+      +'<div style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--cream-deep);border-radius:10px;padding:11px 13px;color:var(--ink);word-break:break-all">const SUPABASE_ANON = "PASTE_YOUR_ANON_KEY_HERE";</div>'
+      +'<p class="lead" style="font-size:14px;margin:12px 0 0">Replace the placeholder with your anon key (keep the quotes), save, and re-deploy. Your Project URL is already set.</p>'
+      +'</div></div>';
+    return;
+  }
+  if(!window.supabase || !window.supabase.createClient){
+    root.innerHTML='<div class="center"><div class="card"><h1 style="font-size:20px;margin:0 0 8px">Couldn\u2019t load</h1><p class="lead" style="font-size:14px;margin:0">The app library didn\u2019t load \u2014 usually a network hiccup. Check your connection and reload.</p><button class="btn btn-soft btn-block" style="margin-top:16px" onclick="location.reload()">Reload</button></div></div>';
+    return;
   }
   sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
-  sb.auth.getSession().then(({data})=>{session=data.session;route();});
+  if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+  sb.auth.getSession().then(({data})=>{session=data.session;route();}).catch(e=>renderError(e.message||String(e)));
   sb.auth.onAuthStateChange((_e,s)=>{session=s;route();});
   document.addEventListener('visibilitychange',()=>{ if(!document.hidden) softRefresh(); });
   pollTimer=setInterval(softRefresh,45000);
@@ -290,7 +330,32 @@ async function resolveHousehold(){
   return null;
 }
 async function loadAll(){
-  await Promise.all([loadProfiles(),loadMembers(),loadMoments(),loadContacts(),loadAppts(),loadDocs(),loadPeople()]);
+  await Promise.all([loadProfiles(),loadMembers(),loadMoments(),loadContacts(),loadAppts(),loadDocs(),loadPeople(),loadProviders(),loadMeds(),loadExpenses()]);
+  myRole=(COL.members.find(m=>m.user_id===session.user.id)||{}).role||null;
+  await prepareSignedUrls();
+}
+async function prepareSignedUrls(){
+  const isPath=v=>v&&!/^data:|^https?:/.test(v);
+  const paths=[];
+  COL.moments.forEach(m=>{if(isPath(m.photo))paths.push(m.photo);});
+  COL.docs.forEach(d=>{if(isPath(d.file))paths.push(d.file);});
+  COL.expenses.forEach(e=>{if(isPath(e.receipt))paths.push(e.receipt);});
+  const need=[...new Set(paths)].filter(p=>!signedCache[p]);
+  if(!need.length)return;
+  try{
+    const {data}=await sb.storage.from('attachments').createSignedUrls(need,3600);
+    (data||[]).forEach(r=>{if(r&&r.signedUrl)signedCache[r.path]=r.signedUrl;});
+  }catch(e){}
+}
+function photoSrc(v){if(!v)return'';if(/^data:|^https?:/.test(v))return v;return signedCache[v]||'';}
+async function uploadDraftPhoto(){
+  if(draftPhotoBlob){
+    const path=household.id+'/'+uid()+'.jpg';
+    const {error}=await sb.storage.from('attachments').upload(path,draftPhotoBlob,{contentType:'image/jpeg',upsert:false});
+    if(error)throw error;
+    return path;
+  }
+  return draftPhotoKept||null;
 }
 async function loadProfiles(){
   const {data,error}=await sb.from('profiles').select('id,display_name');
@@ -319,6 +384,18 @@ async function loadDocs(){
 async function loadPeople(){
   const {data,error}=await sb.from('people').select('*').eq('household_id',household.id).order('created_at',{ascending:true});
   if(error) throw error; COL.people=data||[];
+}
+async function loadProviders(){
+  const {data,error}=await sb.from('providers').select('*').eq('household_id',household.id).order('created_at',{ascending:true});
+  if(error) throw error; COL.providers=data||[];
+}
+async function loadMeds(){
+  const {data,error}=await sb.from('medications').select('*').eq('household_id',household.id).order('active',{ascending:false}).order('created_at',{ascending:true});
+  if(error) throw error; COL.medications=data||[];
+}
+async function loadExpenses(){
+  const {data,error}=await sb.from('expenses').select('*').eq('household_id',household.id).order('spent_on',{ascending:false});
+  if(error) throw error; COL.expenses=data||[];
 }
 
 /* ---------- login / onboard (unchanged scaffold) ---------- */
@@ -402,21 +479,26 @@ function renderApp(){
     '<header class="top"><div class="mark" style="width:28px;height:28px;border-radius:999px;background:var(--sage);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="13" height="13" fill="#F7F2E7" stroke="#F7F2E7" stroke-width="1.5">'+I.heart+'</svg></div>'
     +'<span class="name">tend</span><div class="spacer"></div>'
     +'<button class="chip" data-action="refresh" title="Refresh">'+ic('refresh',15)+'</button>'
+    +'<button class="chip chip-add" data-action="open-add" title="Add">'+ic('plus',16)+'Add</button>'
     +'<button class="chip" data-action="goto-team"><span class="av">'+initial(meName())+'</span>'+esc(meName().split(' ')[0])+'</button>'
     +'</header><main id="main"></main>';
   renderNav(); renderTab();
 }
 function renderNav(){
   const nav=$('navbar'); nav.style.display='flex';
-  const tabs=[['today','home','Today'],['child','heart',childName().split(' ')[0]||'Child'],['case','scale','Case'],['docs','folder','Docs'],['team','users','Team']];
-  nav.innerHTML=tabs.map(t=>{const on=UI.tab===t[0];return '<button class="'+(on?'on':'')+'" data-action="tab" data-tab="'+t[0]+'"><span style="display:flex">'+ic(t[1],21,on?2.2:1.7)+'</span><span>'+esc(t[2])+'</span></button>';}).join('');
+  const tabs=[['today','home','Today'],['child','heart',childName().split(' ')[0]||'Child'],['case','scale','Case'],['health','cross','Health'],['more','folder','More']];
+  const moreTabs=['docs','money','team'];
+  nav.innerHTML=tabs.map(t=>{const on=UI.tab===t[0]||(t[0]==='more'&&moreTabs.indexOf(UI.tab)>=0);return '<button class="'+(on?'on':'')+'" data-action="tab" data-tab="'+t[0]+'"><span style="display:flex">'+ic(t[1],21,on?2.2:1.7)+'</span><span>'+esc(t[2])+'</span></button>';}).join('');
 }
 function renderTab(){
   const m=$('main'); if(!m) return;
   if(UI.tab==='today')m.innerHTML=screenToday();
   else if(UI.tab==='child')m.innerHTML=screenChild();
   else if(UI.tab==='case')m.innerHTML=screenCase();
+  else if(UI.tab==='health')m.innerHTML=screenHealth();
   else if(UI.tab==='docs')m.innerHTML=screenDocs();
+  else if(UI.tab==='money')m.innerHTML=screenMoney();
+  else if(UI.tab==='more')m.innerHTML=screenMore();
   else if(UI.tab==='team')m.innerHTML=screenTeam();
   renderNav(); m.scrollTop=0;
 }
@@ -471,7 +553,8 @@ function screenToday(){
     +quick('add-moment','book',C.sage,C.sageSoft,'Log a moment')
     +quick('add-contact','scale',C.terra,C.terraSoft,'Visit / contact')
     +quick('add-appt','cal',C.gold,'rgba(200,160,85,.18)','Appointment')
-    +quick('add-doc','file',C.sageDeep,C.sageSoft,'Add document')+'</div>';
+    +quick('add-expense','receipt',C.sageDeep,C.sageSoft,'Log an expense')+'</div>';
+  h+='<button class="btn btn-ghost btn-block" style="margin-top:10px" data-action="open-add">'+ic('plus',17)+'Add something else</button>';
   const feed=activityFeed(8);
   h+='<p class="section-label">Recent activity</p>';
   if(!feed.length){h+='<div class="empty"><div class="ic">'+ic('heart',22)+'</div><h3>Nothing logged yet</h3><p>Use the quick-add buttons above to capture the first thing. Small notes add up.</p></div>';}
@@ -498,7 +581,7 @@ function screenChild(){
     h+='<div class="entry"><div class="stem"></div><div class="dot" style="background:'+t.bg+';color:'+t.c+'">'+ic(t.i,18)+'</div>'
       +'<div class="body" data-action="open-moment" data-id="'+m.id+'"><span class="pill" style="background:'+t.bg+';color:'+t.c+'">'+t.l+(m.type==='mood'&&m.mood?' \u00b7 '+esc(m.mood):'')+'</span>'
       +(m.body?'<p style="font-size:14px;line-height:1.5;margin:8px 0 0'+(m.type==='quote'?';font-family:var(--serif);font-style:italic':'')+'">'+(m.type==='quote'?'\u201c':'')+esc(m.body)+(m.type==='quote'?'\u201d':'')+'</p>':'')
-      +(m.photo?'<img class="photo" src="'+m.photo+'" alt="">':'')
+      +(photoSrc(m.photo)?'<img class="photo" src="'+photoSrc(m.photo)+'" alt="">':'')
       +'<div class="meta"><span class="av" style="width:18px;height:18px;font-size:9px">'+initial(who)+'</span><span>'+esc(who.split(' ')[0])+' \u00b7 '+ago(m.created_at)+'</span></div></div></div>';});
   h+='</div>';return h;
 }
@@ -555,7 +638,7 @@ function screenDocs(){
 }
 function docCard(d){
   return '<div class="card" data-action="open-doc" data-id="'+d.id+'" style="cursor:pointer;padding:13px 14px"><div class="row">'
-    +(d.file?'<img src="'+d.file+'" style="width:42px;height:42px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="">':'<div class="ad" style="width:42px;height:42px;border-radius:11px;background:'+C.sageSoft+';color:'+C.sageDeep+'">'+ic('file',18)+'</div>')
+    +(photoSrc(d.file)?'<img src="'+photoSrc(d.file)+'" style="width:42px;height:42px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="">':'<div class="ad" style="width:42px;height:42px;border-radius:11px;background:'+C.sageSoft+';color:'+C.sageDeep+'">'+ic('file',18)+'</div>')
     +'<div class="grow"><p style="font-weight:600;font-size:14px" class="ellip">'+esc(d.name)+'</p><p class="tiny faint" style="margin-top:3px">'+(d.doc_date?fmt(d.doc_date)+' \u00b7 ':'')+(d.holder?'held by '+esc(d.holder):'no holder noted')+'</p></div>'
     +'<span class="faint">'+ic('chevR',18)+'</span></div></div>';
 }
@@ -564,10 +647,14 @@ function docCard(d){
 function screenTeam(){
   let h='<p class="eyebrow">Everyone on her side</p><h1 class="title">Her team.</h1>';
   h+='<p class="section-label">This space</p>';
-  h+='<div class="card"><div class="row" style="align-items:flex-start;flex-wrap:wrap;gap:8px">';
-  h+=COL.members.map(mb=>{const nm=whoName(mb.user_id);const isMe=mb.user_id===session.user.id;return '<div class="chip" style="padding-left:5px"><span class="av" style="width:22px;height:22px;font-size:10px">'+initial(nm)+'</span>'+esc(nm.split(' ')[0])+(isMe?' (you)':'')+' \u00b7 '+esc(roleLabel(mb.role))+'</div>';}).join('');
-  h+='</div>';
-  h+='<p class="tiny muted" style="margin:14px 0 8px;line-height:1.5">Invite your partner or another caregiver by sharing this code. They sign in, choose <b>Join with a code</b>, and enter it.</p>';
+  const admin=myRole==='caregiver';
+  h+='<div class="card">';
+  h+=COL.members.map(mb=>{const nm=whoName(mb.user_id);const isMe=mb.user_id===session.user.id;const canManage=admin&&!isMe;
+    return '<div class="row" style="padding:9px 0;border-bottom:1px solid var(--line)'+(canManage?';cursor:pointer':'')+'"'+(canManage?' data-action="manage-member" data-id="'+mb.user_id+'"':'')+'>'
+    +'<span class="av" style="width:34px;height:34px;font-size:14px">'+initial(nm)+'</span>'
+    +'<div class="grow"><p style="font-size:14px;font-weight:600">'+esc(nm)+(isMe?' <span class="faint" style="font-weight:500">(you)</span>':'')+'</p><p class="tiny faint" style="margin-top:2px">'+esc(roleLabel(mb.role))+'</p></div>'
+    +(canManage?'<span class="faint">'+ic('chevR',17)+'</span>':'')+'</div>';}).join('');
+  h+='<p class="tiny muted" style="margin:14px 0 8px;line-height:1.5">'+(admin?'Invite a partner or caregiver with this code \u2014 they sign in, choose <b>Join with a code</b>, and enter it.':'Members can invite others by sharing this code.')+'</p>';
   h+='<div class="codebox">'+esc(household.invite_code||'\u2014')+'</div>';
   h+='<div class="fab-row" style="margin-top:10px"><button class="btn btn-soft" data-action="copy-code">Copy code</button><button class="btn btn-ghost" data-action="regen-code">New code</button></div>';
   h+='<div class="note" style="margin-top:12px">'+ic('spark',16)+'<div>Role-based invites for caseworkers, GALs, and therapists \u2014 each with a limited view \u2014 are coming as the next stakeholders come online.</div></div>';
@@ -575,7 +662,14 @@ function screenTeam(){
   h+=teamGroup('Case team','caseteam','Caseworker, GAL, CASA, therapist\u2026');
   h+=teamGroup('Biological family','biofamily','Bio parents, grandparents, siblings\u2026');
   h+='<div class="divider"></div>';
+  h+='<p class="section-label" style="margin-top:0">Reminders</p>';
+  h+='<div class="card" id="remindCard"><div class="row"><div class="ad" style="width:40px;height:40px;border-radius:12px;background:'+C.sageSoft+';color:'+C.sageDeep+'">'+ic('alert',18)+'</div>'
+    +'<div class="grow"><p style="font-weight:600;font-size:14.5px">Appointment reminders</p><p class="tiny faint" id="remindSub" style="margin-top:2px">Checking\u2026</p></div>'
+    +'<div id="remindCtl"></div></div></div>';
+  refreshRemindCard();
+  h+='<div class="divider"></div>';
   h+='<div class="card"><p class="tiny muted" style="margin:0 0 12px;line-height:1.55">Signed in as <b>'+esc(meName())+'</b>. Everything is saved to the cloud and synced across the devices in this space.</p>'
+    +(COL.members.length>1?'<button class="btn btn-ghost btn-block" style="margin-bottom:10px;color:'+C.terra+';border-color:'+C.terraSoft+'" data-action="leave-space">Leave this space</button>':'')
     +'<button class="btn btn-ghost btn-block" data-action="signout">'+ic('out',16)+'Sign out</button></div>';
   h+='<p class="tiny faint" style="text-align:center;margin-top:18px;line-height:1.5">tend \u00b7 kinship</p>';
   return h;
@@ -596,6 +690,105 @@ function teamGroup(title,kind,hint){
 }
 
 /* =========================================================
+   UNIFIED ADD CHOOSER
+========================================================= */
+function addChooser(){
+  const opts=[
+    ['add-moment','book',C.sage,C.sageSoft,'Moment','a note, mood, milestone, quote or photo'],
+    ['add-contact','scale',C.terra,C.terraSoft,'Visit or contact','biological-family visit, call or message'],
+    ['add-appt','cal',C.gold,'rgba(200,160,85,.18)','Appointment','hearing, therapy, medical, caseworker'],
+    ['add-provider','cross',C.terra,C.terraSoft,'Provider','doctor, dentist, eye doctor, pharmacy'],
+    ['add-med','pill',C.sageDeep,C.sageSoft,'Medication','prescription, eyeglasses, dosage'],
+    ['add-expense','receipt',C.sageDeep,C.sageSoft,'Expense','money spent, for reimbursement or records'],
+    ['add-doc','file',C.sage,C.sageSoft,'Document','placement order, records, scans'],
+    ['add-person','users',C.gold,'rgba(200,160,85,.18)','Person','case team or biological family']
+  ];
+  let h='<h2>Add to '+esc(childName())+'\u2019s record</h2><p class="glead">What would you like to capture?</p><div class="chooser">';
+  h+=opts.map(o=>'<button class="choice" data-action="'+o[0]+'"><span class="ci" style="background:'+o[3]+';color:'+o[2]+'">'+ic(o[1],20)+'</span><span class="ct"><b>'+o[4]+'</b><small>'+o[5]+'</small></span></button>').join('');
+  h+='</div>';
+  openSheet(h);
+}
+
+/* =========================================================
+   HEALTH
+========================================================= */
+function screenHealth(){
+  let h='<p class="eyebrow">Care, kept straight</p><h1 class="title">Health.</h1>';
+  h+='<div class="seg" style="margin-top:16px"><button class="'+(UI.healthSeg==='providers'?'on':'')+'" data-action="health-seg" data-s="providers">Providers</button>'
+    +'<button class="'+(UI.healthSeg==='meds'?'on':'')+'" data-action="health-seg" data-s="meds">Medications</button></div>';
+  if(UI.healthSeg==='providers'){
+    h+='<button class="btn btn-primary btn-block" style="margin-top:14px" data-action="add-provider">'+ic('plus',18)+'Add a provider</button>';
+    if(!COL.providers.length){h+='<div class="empty" style="margin-top:18px"><div class="ic">'+ic('cross',22)+'</div><h3>Her care team</h3><p>Pediatrician, dentist, eye doctor, therapist, pharmacy \u2014 names and numbers in one place, ready when you need them.</p><button class="btn btn-soft" data-action="add-provider">Add the first provider</button></div>';}
+    else h+='<div style="margin-top:8px">'+COL.providers.map(providerCard).join('')+'</div>';
+  } else {
+    h+='<button class="btn btn-soft btn-block" style="margin-top:14px" data-action="add-med">'+ic('plus',18)+'Add a medication or prescription</button>';
+    const active=COL.medications.filter(m=>m.active),past=COL.medications.filter(m=>!m.active);
+    if(!active.length&&!past.length){h+='<div class="empty" style="margin-top:18px"><div class="ic">'+ic('pill',22)+'</div><h3>Medications & prescriptions</h3><p>Daily medications, dosages, refill dates, even her eyeglasses prescription. Never guess at a dose again.</p><button class="btn btn-soft" data-action="add-med">Add the first one</button></div>';}
+    else{if(active.length)h+='<p class="section-label">Current</p>'+active.map(medCard).join('');if(past.length)h+='<p class="section-label">Past</p>'+past.map(medCard).join('');}
+  }
+  return h;
+}
+function providerCard(p){
+  const k=PROVIDER_KINDS[p.kind]||PROVIDER_KINDS.other;
+  return '<div class="card" data-action="open-provider" data-id="'+p.id+'" style="cursor:pointer;padding:13px 14px"><div class="row">'
+    +'<div class="ad" style="width:40px;height:40px;border-radius:12px;background:'+C.terraSoft+';color:'+C.terra+'">'+ic(k.i,18)+'</div>'
+    +'<div class="grow"><p style="font-weight:600;font-size:14px">'+esc(p.name)+'</p><p class="tiny faint" style="margin-top:2px">'+esc([k.l,p.specialty,p.org].filter(Boolean).join(' \u00b7 '))+'</p></div>'
+    +(p.phone?'<a class="icon-btn" style="background:'+C.sageSoft+';color:'+C.sageDeep+'" href="tel:'+esc(p.phone)+'" onclick="event.stopPropagation()">'+ic('phone',15)+'</a>':'')
+    +'<span class="faint" style="margin-left:6px">'+ic('chevR',17)+'</span></div></div>';
+}
+function medCard(m){
+  const k=MED_KINDS[m.kind]||MED_KINDS.other;const refillSoon=m.refill_date&&daysUntil(m.refill_date)!=null&&daysUntil(m.refill_date)<=7&&daysUntil(m.refill_date)>=0;
+  return '<div class="card" data-action="open-med" data-id="'+m.id+'" style="cursor:pointer;padding:13px 14px;opacity:'+(m.active?'1':'.7')+'"><div class="row">'
+    +'<div class="ad" style="width:40px;height:40px;border-radius:12px;background:'+C.sageSoft+';color:'+C.sageDeep+'">'+ic(k.i,18)+'</div>'
+    +'<div class="grow"><p style="font-weight:600;font-size:14px">'+esc(m.name)+(m.dose?' \u00b7 '+esc(m.dose):'')+'</p><p class="tiny faint" style="margin-top:2px">'+esc([m.schedule,m.prescriber].filter(Boolean).join(' \u00b7 ')||k.l)+(m.refill_date?' \u00b7 refill '+fmt(m.refill_date):'')+'</p></div>'
+    +(refillSoon?'<span class="pill" style="background:'+C.terraSoft+';color:'+C.terra+'">refill soon</span>':'')+'</div></div>';
+}
+
+/* =========================================================
+   MONEY (expenses)
+========================================================= */
+function screenMoney(){
+  let h='<p class="eyebrow">Where it goes, what comes back</p><h1 class="title">Expenses.</h1>';
+  const total=COL.expenses.reduce((s,e)=>s+(e.amount_cents||0),0);
+  const reimbursable=COL.expenses.filter(e=>e.reimbursable);
+  const pending=reimbursable.filter(e=>e.status!=='reimbursed').reduce((s,e)=>s+(e.amount_cents||0),0);
+  const back=COL.expenses.filter(e=>e.status==='reimbursed').reduce((s,e)=>s+(e.amount_cents||0),0);
+  h+='<div class="card" style="margin-top:16px;background:linear-gradient(135deg,'+C.sageSoft+',rgba(212,220,201,.3));border:none"><div class="stat">'
+    +'<div><div class="n">'+dollars(total)+'</div><div class="l">total logged</div></div>'
+    +'<div><div class="n">'+dollars(pending)+'</div><div class="l">awaiting reimbursement</div></div>'
+    +'<div><div class="n">'+dollars(back)+'</div><div class="l">reimbursed</div></div></div></div>';
+  h+='<button class="btn btn-primary btn-block" style="margin-top:14px" data-action="add-expense">'+ic('plus',18)+'Log an expense</button>';
+  if(COL.expenses.length){h+='<button class="btn btn-ghost btn-block" style="margin-top:10px" data-action="expense-report">'+ic('receipt',17)+'Build a reimbursement report</button>';}
+  if(!COL.expenses.length){h+='<div class="empty" style="margin-top:18px"><div class="ic">'+ic('wallet',22)+'</div><h3>Track what you spend</h3><p>Clothing, co-pays, school fees, gas to visits. Snap the receipt, mark what\u2019s reimbursable, and hand the caseworker a clean total.</p><button class="btn btn-soft" data-action="add-expense">Log the first expense</button></div>';return h;}
+  h+='<div style="margin-top:8px">'+COL.expenses.map(expenseCard).join('')+'</div>';
+  return h;
+}
+function expenseCard(e){
+  const st=EXP_STATUS[e.status]||EXP_STATUS.logged;
+  return '<div class="card" data-action="open-expense" data-id="'+e.id+'" style="cursor:pointer;padding:13px 14px"><div class="row">'
+    +(photoSrc(e.receipt)?'<img src="'+photoSrc(e.receipt)+'" style="width:40px;height:40px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="">':'<div class="ad" style="width:40px;height:40px;border-radius:12px;background:'+C.sageSoft+';color:'+C.sageDeep+'">'+ic('receipt',18)+'</div>')
+    +'<div class="grow"><p style="font-weight:600;font-size:14px">'+esc(e.description)+'</p><p class="tiny faint" style="margin-top:2px">'+esc([e.category,fmt(e.spent_on)].filter(Boolean).join(' \u00b7 '))+'</p></div>'
+    +'<div style="text-align:right"><p style="font-family:var(--serif);font-weight:600;font-size:16px">'+dollars(e.amount_cents)+'</p><span class="pill" style="background:'+st.bg+';color:'+st.c+';margin-top:3px;display:inline-block">'+st.l+'</span></div></div></div>';
+}
+
+/* =========================================================
+   MORE (hub for Docs, Money, Team)
+========================================================= */
+function screenMore(){
+  let h='<p class="eyebrow">More</p><h1 class="title">More.</h1>';
+  const items=[
+    ['docs','folder',C.sage,C.sageSoft,'Documents',COL.docs.length+' on file'],
+    ['money','wallet',C.sageDeep,C.sageSoft,'Expenses',COL.expenses.length?dollars(COL.expenses.reduce((s,e)=>s+(e.amount_cents||0),0))+' logged':'nothing logged yet'],
+    ['team','users',C.terra,C.terraSoft,'Team & settings',COL.members.length+(COL.members.length===1?' member':' members')]
+  ];
+  h+='<div style="margin-top:16px">'+items.map(it=>'<div class="card" data-action="tab" data-tab="'+it[0]+'" style="cursor:pointer;margin-bottom:10px"><div class="row">'
+    +'<div class="ad" style="width:42px;height:42px;border-radius:12px;background:'+it[3]+';color:'+it[2]+'">'+ic(it[1],19)+'</div>'
+    +'<div class="grow"><p style="font-weight:600;font-size:15px">'+it[4]+'</p><p class="tiny faint" style="margin-top:2px">'+esc(it[5])+'</p></div>'
+    +'<span class="faint">'+ic('chevR',18)+'</span></div></div>').join('')+'</div>';
+  return h;
+}
+
+/* =========================================================
    MODALS
 ========================================================= */
 function openSheet(inner){
@@ -604,7 +797,7 @@ function openSheet(inner){
   requestAnimationFrame(()=>{const s=$('scrim');if(s)s.classList.add('show');});
   $('scrim').addEventListener('click',e=>{if(e.target.id==='scrim')closeSheet();});
 }
-function closeSheet(){const s=$('scrim');modalOpen=false;draftPhoto=null;editId=null;if(!s)return;s.classList.remove('show');setTimeout(()=>{$('modalRoot').innerHTML='';},200);}
+function closeSheet(){const s=$('scrim');modalOpen=false;draftPhotoPreview=null;draftPhotoBlob=null;draftPhotoKept=null;editId=null;if(!s)return;s.classList.remove('show');setTimeout(()=>{$('modalRoot').innerHTML='';},200);}
 function val(id){const e=$(id);return e?e.value.trim():'';}
 function sw(id){const e=$(id);return e?e.classList.contains('on'):false;}
 function actionsRow(saveAct,delAct){return '<div class="sheet-actions">'+(delAct?'<button class="btn btn-ghost" style="color:'+C.terra+';flex:0 0 auto" data-action="'+delAct+'">'+ic('trash',16)+'</button>':'')+'<button class="btn btn-ghost grow" data-action="close">Cancel</button><button class="btn btn-primary grow" data-action="'+saveAct+'">Save</button></div>';}
@@ -613,7 +806,7 @@ function bindPickers(){document.querySelectorAll('[data-picker]').forEach(row=>{
 
 /* MOMENT */
 function momentModal(m){
-  editId=m?m.id:null;draftPhoto=m?m.photo||null:null;const cur=m?m.type:'note';
+  editId=m?m.id:null;setDraftFromExisting(m?m.photo:null);const cur=m?m.type:'note';
   const opts=[['note','Note'],['mood','Mood'],['milestone','Milestone'],['quote','Quote'],['memory','Photo'],['health','Health']];
   let h='<h2>'+(m?'Edit moment':'Log a moment')+'</h2><p class="glead">A small thing about '+esc(childName())+'.</p>';
   h+='<label class="fld"><span>Type</span></label>'+picker('m_type',opts,cur,'moment-type');
@@ -629,8 +822,9 @@ function momentPh(t){return t==='quote'?'\u201cI want the bunny book again\u2026
 function reflectMomentType(t){const mw=$('moodWrap');if(mw)mw.style.display=t==='mood'?'block':'none';const l=$('m_textlabel');if(l)l.textContent=momentLabel(t);const ta=$('m_body');if(ta)ta.placeholder=momentPh(t);}
 async function saveMoment(){
   const type=val('m_type'),body=val('m_body'),occurred_on=val('m_date')||todayStr(),mood=val('m_mood');
-  if(!body&&type!=='mood'&&!draftPhoto){$('mErr').innerHTML='<div class="err">Add a few words or a photo first.</div>';return;}
-  const payload={type,body,occurred_on,mood:type==='mood'?mood:null,photo:draftPhoto};
+  if(!body&&type!=='mood'&&!draftPhotoBlob&&!draftPhotoKept){$('mErr').innerHTML='<div class="err">Add a few words or a photo first.</div>';return;}
+  let photo;try{photo=await uploadDraftPhoto();}catch(e){$('mErr').innerHTML='<div class="err">Photo upload failed: '+esc(e.message||'')+'</div>';return;}
+  const payload={type,body,occurred_on,mood:type==='mood'?mood:null,photo};
   await saveRow('moments',payload,loadMoments);
 }
 
@@ -677,7 +871,7 @@ async function saveAppt(){
 
 /* DOC */
 function docModal(d){
-  editId=d?d.id:null;draftPhoto=d?d.file||null:null;
+  editId=d?d.id:null;setDraftFromExisting(d?d.file:null);
   let h='<h2>'+(d?'Edit document':'Add a document')+'</h2><p class="glead">Track what you have and who holds the original.</p>';
   h+='<label class="fld"><span>What is it</span><input type="text" id="d_name" placeholder="e.g. Initial placement order" value="'+esc(d?d.name:'')+'"></label>';
   h+='<label class="fld"><span>Category</span><select id="d_cat">'+DOC_CATS.map(c=>'<option '+((d&&d.category===c)?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label>';
@@ -689,7 +883,8 @@ function docModal(d){
 }
 async function saveDoc(){
   const name=val('d_name');if(!name){$('dErr').innerHTML='<div class="err">Give the document a name.</div>';return;}
-  const o={name,category:val('d_cat')||'Other',doc_date:val('d_date')||null,holder:val('d_holder'),notes:val('d_notes'),file:draftPhoto};
+  let file;try{file=await uploadDraftPhoto();}catch(e){$('dErr').innerHTML='<div class="err">File upload failed: '+esc(e.message||'')+'</div>';return;}
+  const o={name,category:val('d_cat')||'Other',doc_date:val('d_date')||null,holder:val('d_holder'),notes:val('d_notes'),file};
   await saveRow('documents',o,loadDocs);
 }
 
@@ -712,6 +907,89 @@ async function savePerson(){
   const o={name,role:val('p_role'),org:val('p_org'),phone:val('p_phone'),email:val('p_email'),kind:val('p_kind'),color:(editId?undefined:PERSON_COLORS[used%PERSON_COLORS.length])};
   if(editId)delete o.color;
   await saveRow('people',o,loadPeople);
+}
+
+/* PROVIDER */
+function providerModal(p){
+  editId=p?p.id:null;const cur=p?p.kind:'doctor';
+  const opts=Object.keys(PROVIDER_KINDS).map(k=>[k,PROVIDER_KINDS[k].l]);
+  let h='<h2>'+(p?'Edit provider':'Add a provider')+'</h2><p class="glead">A doctor, dentist, eye doctor, therapist, or pharmacy.</p>';
+  h+='<label class="fld"><span>Type</span></label>'+picker('pr_kind',opts,cur);
+  h+='<label class="fld"><span>Name</span><input type="text" id="pr_name" placeholder="e.g. Dr. Sarah Brennan" value="'+esc(p?p.name:'')+'"></label>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Specialty</span><input type="text" id="pr_spec" placeholder="Pediatrics\u2026" value="'+esc(p?p.specialty:'')+'"></label><label class="fld grow"><span>Practice / org</span><input type="text" id="pr_org" placeholder="Bedford Children\u2019s" value="'+esc(p?p.org:'')+'"></label></div>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Phone</span><input type="tel" id="pr_phone" value="'+esc(p?p.phone:'')+'"></label><label class="fld grow"><span>Address</span><input type="text" id="pr_addr" value="'+esc(p?p.address:'')+'"></label></div>';
+  h+='<label class="fld"><span>Notes</span><textarea id="pr_notes" placeholder="Portal login, preferred contact, anything to remember\u2026">'+esc(p?p.notes:'')+'</textarea></label>';
+  h+='<div id="prErr"></div>'+actionsRow('save-provider',p?'del-provider':null);
+  openSheet(h);bindPickers();
+}
+async function saveProvider(){
+  const name=val('pr_name');if(!name){$('prErr').innerHTML='<div class="err">Add a name.</div>';return;}
+  const o={kind:val('pr_kind'),name,specialty:val('pr_spec'),org:val('pr_org'),phone:val('pr_phone'),address:val('pr_addr'),notes:val('pr_notes')};
+  await saveRow('providers',o,loadProviders);
+}
+
+/* MEDICATION */
+function medModal(m){
+  editId=m?m.id:null;const cur=m?m.kind:'medication';
+  const opts=Object.keys(MED_KINDS).map(k=>[k,MED_KINDS[k].l]);
+  let h='<h2>'+(m?'Edit medication':'Add a medication')+'</h2><p class="glead">A prescription, an over-the-counter routine, or an eyeglasses prescription.</p>';
+  h+='<label class="fld"><span>Type</span></label>'+picker('md_kind',opts,cur);
+  h+='<label class="fld"><span>Name</span><input type="text" id="md_name" placeholder="e.g. Amoxicillin, or \u201cReading glasses\u201d" value="'+esc(m?m.name:'')+'"></label>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Dose / strength</span><input type="text" id="md_dose" placeholder="250mg / -2.25" value="'+esc(m?m.dose:'')+'"></label><label class="fld grow"><span>Schedule</span><input type="text" id="md_sched" placeholder="Twice daily / as needed" value="'+esc(m?m.schedule:'')+'"></label></div>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Prescriber</span><input type="text" id="md_presc" placeholder="Dr. Brennan" value="'+esc(m?m.prescriber:'')+'"></label><label class="fld grow"><span>Pharmacy</span><input type="text" id="md_pharm" placeholder="CVS Bedford" value="'+esc(m?m.pharmacy:'')+'"></label></div>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Started</span><input type="date" id="md_start" value="'+(m?m.start_date||'':'')+'"></label><label class="fld grow"><span>Refill / re-check</span><input type="date" id="md_refill" value="'+(m?m.refill_date||'':'')+'"></label></div>';
+  h+='<label class="fld"><span>Notes</span><textarea id="md_notes" placeholder="With food, side effects to watch\u2026">'+esc(m?m.notes:'')+'</textarea></label>';
+  h+='<div class="togglerow"><span class="lab">Currently active</span><div class="switch '+((m?m.active:true)?'on':'')+'" data-action="toggle" id="md_active"><i></i></div></div>';
+  h+='<div id="mdErr"></div>'+actionsRow('save-med',m?'del-med':null);
+  openSheet(h);bindPickers();
+}
+async function saveMed(){
+  const name=val('md_name');if(!name){$('mdErr').innerHTML='<div class="err">Add a name.</div>';return;}
+  const o={kind:val('md_kind'),name,dose:val('md_dose'),schedule:val('md_sched'),prescriber:val('md_presc'),pharmacy:val('md_pharm'),start_date:val('md_start')||null,refill_date:val('md_refill')||null,active:sw('md_active'),notes:val('md_notes')};
+  await saveRow('medications',o,loadMeds);
+}
+
+/* EXPENSE */
+function expenseModal(e){
+  editId=e?e.id:null;setDraftFromExisting(e?e.receipt:null);
+  const stOpts=[['logged','Logged'],['submitted','Submitted'],['reimbursed','Reimbursed']];
+  let h='<h2>'+(e?'Edit expense':'Log an expense')+'</h2><p class="glead">Money spent on '+esc(childName())+'. Snap the receipt and mark whether it\u2019s reimbursable.</p>';
+  h+='<label class="fld"><span>What was it</span><input type="text" id="e_desc" placeholder="e.g. Winter coat" value="'+esc(e?e.description:'')+'"></label>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Amount</span><input type="text" id="e_amt" inputmode="decimal" placeholder="0.00" value="'+(e?(e.amount_cents/100).toFixed(2):'')+'"></label><label class="fld grow"><span>Date</span><input type="date" id="e_date" value="'+(e?e.spent_on:todayStr())+'"></label></div>';
+  h+='<label class="fld"><span>Category</span><select id="e_cat">'+EXP_CATS.map(c=>'<option '+((e&&e.category===c)?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label>';
+  h+='<div class="togglerow"><span class="lab">Reimbursable</span><div class="switch '+((e?e.reimbursable:true)?'on':'')+'" data-action="toggle" id="e_reimb"><i></i></div></div>';
+  h+='<label class="fld"><span>Status</span></label>'+picker('e_status',stOpts,e?e.status:'logged');
+  h+='<label class="fld"><span>Notes</span><textarea id="e_notes" placeholder="What it was for, who to submit to\u2026">'+esc(e?e.notes:'')+'</textarea></label>';
+  h+='<div id="photoSlot">'+photoSlotHTML('Add a receipt photo')+'</div>';
+  h+='<div id="eErr"></div>'+actionsRow('save-expense',e?'del-expense':null);
+  openSheet(h);bindPickers();
+}
+async function saveExpense(){
+  const description=val('e_desc');if(!description){$('eErr').innerHTML='<div class="err">Add a short description.</div>';return;}
+  let receipt;try{receipt=await uploadDraftPhoto();}catch(err){$('eErr').innerHTML='<div class="err">Receipt upload failed: '+esc(err.message||'')+'</div>';return;}
+  const o={description,amount_cents:parseAmount(val('e_amt')),spent_on:val('e_date')||todayStr(),category:val('e_cat')||'Other',reimbursable:sw('e_reimb'),status:val('e_status')||'logged',notes:val('e_notes'),receipt};
+  await saveRow('expenses',o,loadExpenses);
+}
+function expenseReport(){
+  const reimb=COL.expenses.filter(e=>e.reimbursable).slice().sort((a,b)=>a.spent_on.localeCompare(b.spent_on));
+  const nm=childName();
+  const total=reimb.reduce((s,e)=>s+(e.amount_cents||0),0);
+  const pending=reimb.filter(e=>e.status!=='reimbursed').reduce((s,e)=>s+(e.amount_cents||0),0);
+  let p='<div class="pk-noprint" style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-ghost" data-action="close-packet">Close</button><button class="btn btn-primary" data-action="print-packet">'+ic('receipt',16)+'Print / Save PDF</button></div>';
+  p+='<div class="pk-h"><h1 style="font-family:var(--serif);font-size:24px;font-weight:600;margin:0">Reimbursement report \u2014 '+esc(nm)+'</h1><p class="tiny muted" style="margin:6px 0 0">Compiled '+esc(fmtLong(todayStr()))+' by '+esc(meName())+' \u00b7 '+reimb.length+' reimbursable items</p></div>';
+  if(!reimb.length){p+='<p class="muted" style="margin-top:22px">No reimbursable expenses logged yet.</p>';}
+  else{
+    p+='<div class="pk-sec"><h3>Reimbursable expenses</h3>';
+    p+=reimb.map(e=>{const st=EXP_STATUS[e.status]||EXP_STATUS.logged;return '<div class="pk-item"><div class="row" style="align-items:flex-start;gap:10px"><span class="d" style="min-width:54px">'+fmt(e.spent_on)+'</span><div class="grow"><b>'+esc(e.description)+'</b> \u00b7 '+esc(e.category||'')+' \u2014 '+st.l+(e.notes?'<br><span class="d">'+esc(e.notes)+'</span>':'')+'</div><b style="white-space:nowrap">'+dollars(e.amount_cents)+'</b></div></div>';}).join('');
+    p+='</div>';
+    p+='<div class="pk-sec"><h3>Totals</h3><div class="pk-item"><div class="row"><div class="grow"><b>Total reimbursable</b></div><b>'+dollars(total)+'</b></div></div><div class="pk-item"><div class="row"><div class="grow">Still awaiting reimbursement</div><b>'+dollars(pending)+'</b></div></div></div>';
+  }
+  p+='<p class="tiny faint" style="margin-top:28px;border-top:1px solid var(--line);padding-top:12px">This is a personal expense record compiled by the family from their own logs, intended to support a reimbursement or subsidy request. Receipts available on request.</p>';
+  closeSheet();
+  const pv=$('packetView');
+  pv.innerHTML='<div style="max-width:680px;margin:0 auto">'+p+'</div>';
+  pv.style.cssText='display:block;position:fixed;inset:0;z-index:60;overflow-y:auto;background:'+C.bone+';padding:max(20px,env(safe-area-inset-top)) 20px 40px;';
+  pv.scrollTop=0;
 }
 
 /* generic save/delete */
@@ -761,18 +1039,106 @@ function genPacket(){
 function pkSec(t,items){if(!items.length)return'';return '<div class="pk-sec"><h3>'+esc(t)+'</h3>'+items.join('')+'</div>';}
 function pkItem(date,body){return '<div class="pk-item"><span class="d">'+esc(date)+'</span><div style="margin-top:2px">'+body+'</div></div>';}
 
-/* ---------- PHOTO ---------- */
+/* ---------- PHOTO (uploads to Supabase Storage) ---------- */
 function photoSlotHTML(label){
-  if(draftPhoto)return '<div class="photo-prev"><img src="'+draftPhoto+'" alt=""><button class="icon-btn rm" data-action="rm-photo">'+ic('x',16)+'</button></div>';
+  if(draftPhotoPreview)return '<div class="photo-prev"><img src="'+draftPhotoPreview+'" alt=""><button class="icon-btn rm" data-action="rm-photo">'+ic('x',16)+'</button></div>';
   return '<div class="photo-add" data-action="pick-photo">'+ic('cam',18)+esc(label||'Add a photo')+'<input type="file" id="photoInput" accept="image/*" style="display:none"></div>';
 }
-function pickPhoto(){const inp=$('photoInput');if(!inp)return;inp.onchange=()=>{const f=inp.files&&inp.files[0];if(!f)return;compressImage(f,u=>{draftPhoto=u;const s=$('photoSlot');if(s)s.innerHTML=photoSlotHTML();});};inp.click();}
-function compressImage(file,cb){const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const max=900;let w=img.width,h=img.height;if(w>h&&w>max){h=h*max/w;w=max;}else if(h>max){w=w*max/h;h=max;}const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);try{cb(cv.toDataURL('image/jpeg',0.62));}catch(e){cb(r.result);}};img.onerror=()=>cb(r.result);img.src=r.result;};r.readAsDataURL(file);}
+function setDraftFromExisting(v){draftPhotoKept=v||null;draftPhotoBlob=null;draftPhotoPreview=v?photoSrc(v):null;}
+function pickPhoto(){const inp=$('photoInput');if(!inp)return;inp.onchange=()=>{const f=inp.files&&inp.files[0];if(!f)return;compressImage(f,(dataUrl,blob)=>{draftPhotoPreview=dataUrl;draftPhotoBlob=blob;draftPhotoKept=null;const s=$('photoSlot');if(s)s.innerHTML=photoSlotHTML();});};inp.click();}
+function compressImage(file,cb){const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const max=1200;let w=img.width,h=img.height;if(w>h&&w>max){h=h*max/w;w=max;}else if(h>max){w=w*max/h;h=max;}const cv=document.createElement('canvas');cv.width=Math.round(w);cv.height=Math.round(h);cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);const dataUrl=(function(){try{return cv.toDataURL('image/jpeg',0.72);}catch(e){return r.result;}})();if(cv.toBlob){cv.toBlob(b=>cb(dataUrl,b),'image/jpeg',0.72);}else{cb(dataUrl,null);}};img.onerror=()=>cb(r.result,null);img.src=r.result;};r.readAsDataURL(file);}
 
 /* ---------- misc actions ---------- */
 function showInviteAlert(){alert('Invite code for this space:\n\n   '+(household.invite_code||'\u2014')+'\n\nHave the other person sign in, choose \u201cJoin with a code,\u201d and enter it.');}
 async function copyCode(){const code=household.invite_code||'';try{await navigator.clipboard.writeText(code);alert('Copied: '+code);}catch(e){showInviteAlert();}}
 async function regenCode(){if(!confirm('Generate a new invite code? The old one will stop working.'))return;const code=newCode();const {error}=await sb.from('households').update({invite_code:code}).eq('id',household.id);if(error){alert(error.message);return;}household.invite_code=code;renderTab();}
+function manageMemberModal(targetId){
+  const mb=COL.members.find(m=>m.user_id===targetId);if(!mb)return;
+  editId=null;const nm=whoName(targetId);
+  const roles=[['caregiver','Caregiver'],['co_caregiver','Co-caregiver'],['viewer','Viewer']];
+  let h='<h2>'+esc(nm)+'</h2><p class="glead">Set this person\u2019s role, or remove them from the space. Caregivers have full admin control.</p>';
+  h+='<label class="fld"><span>Role</span></label>'+picker('mm_role',roles,mb.role);
+  h+='<input type="hidden" id="mm_uid" value="'+esc(targetId)+'"><div id="mmErr"></div>';
+  h+='<div class="sheet-actions"><button class="btn btn-ghost" style="color:'+C.terra+';flex:0 0 auto" data-action="remove-member">'+ic('trash',16)+'</button><button class="btn btn-ghost grow" data-action="close">Cancel</button><button class="btn btn-primary grow" data-action="save-member-role">Save role</button></div>';
+  openSheet(h);bindPickers();
+}
+async function saveMemberRole(){
+  const target=val('mm_uid'),role=val('mm_role');
+  try{const {error}=await sb.rpc('set_member_role',{p_household:household.id,p_user:target,p_role:role});if(error)throw error;closeSheet();await loadMembers();renderTab();}
+  catch(e){const b=$('mmErr');if(b)b.innerHTML='<div class="err">'+esc(e.message||'Could not update.')+'</div>';}
+}
+async function removeMember(){
+  const target=val('mm_uid');const nm=whoName(target);
+  if(!confirm('Remove '+nm+' from this space? They will lose access to these records.'))return;
+  try{const {error}=await sb.rpc('remove_member',{p_household:household.id,p_user:target});if(error)throw error;closeSheet();await loadMembers();renderTab();}
+  catch(e){const b=$('mmErr');if(b)b.innerHTML='<div class="err">'+esc(e.message||'Could not remove.')+'</div>';}
+}
+async function leaveSpace(){
+  if(!confirm('Leave this space? You will lose access to these records. This cannot be undone.'))return;
+  try{const {error}=await sb.rpc('leave_household',{p_household:household.id});if(error){alert(error.message);return;}household=null;myRole=null;await route();}
+  catch(e){alert(e.message||'Could not leave.');}
+}
+/* ---------- PUSH NOTIFICATIONS ---------- */
+async function refreshRemindCard(){
+  const sub=$('remindSub'),ctl=$('remindCtl'); if(!sub||!ctl)return;
+  const st=await pushStatus();
+  if(st==='unavailable'){
+    sub.textContent='Add Tend to your Home Screen to enable reminders (Share \u2192 Add to Home Screen on iPhone).';
+    ctl.innerHTML='';
+  } else if(st==='denied'){
+    sub.textContent='Notifications are blocked in your device settings. Re-enable them for Tend, then come back.';
+    ctl.innerHTML='';
+  } else if(st==='on'){
+    sub.textContent='On \u2014 you\u2019ll get a heads-up before hearings and appointments.';
+    ctl.innerHTML='<button class="btn btn-ghost btn-sm" data-action="push-off">Turn off</button>';
+  } else {
+    sub.textContent='Get a notification the day before a hearing or appointment.';
+    ctl.innerHTML='<button class="btn btn-soft btn-sm" data-action="push-on">Turn on</button>';
+  }
+}
+function pushConfigured(){ return VAPID_PUBLIC && VAPID_PUBLIC!=='PASTE_YOUR_VAPID_PUBLIC_KEY_HERE'; }
+function pushSupported(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function urlB64ToUint8(base64){
+  const pad='='.repeat((4-base64.length%4)%4);
+  const b=(base64+pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(b); const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+async function pushStatus(){
+  if(!pushSupported()||!pushConfigured())return 'unavailable';
+  if(Notification.permission==='denied')return 'denied';
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    return sub?'on':'off';
+  }catch(e){ return 'off'; }
+}
+async function enablePush(){
+  if(!pushSupported()){alert('This device or browser doesn\u2019t support reminders. On iPhone, add Tend to your Home Screen first (Share \u2192 Add to Home Screen), then try again.');return;}
+  if(!pushConfigured()){alert('Reminders aren\u2019t set up on this copy of Tend yet.');return;}
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){renderTab();return;}
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){ sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8(VAPID_PUBLIC)}); }
+    const j=sub.toJSON();
+    await sb.from('push_subscriptions').upsert({
+      household_id:household.id, user_id:session.user.id,
+      endpoint:sub.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth
+    },{onConflict:'endpoint'});
+    renderTab();
+  }catch(e){ alert('Could not turn on reminders: '+(e.message||e)); }
+}
+async function disablePush(){
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(sub){ await sb.from('push_subscriptions').delete().eq('endpoint',sub.endpoint); await sub.unsubscribe(); }
+    renderTab();
+  }catch(e){ alert('Could not turn off reminders: '+(e.message||e)); }
+}
 async function signOut(){if(pollTimer)clearInterval(pollTimer);await sb.auth.signOut();household=null;profiles={};COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[]};session=null;hideNav();renderLogin();}
 
 function renderError(msg){
@@ -785,11 +1151,13 @@ document.addEventListener('click',e=>{
   const a=t.getAttribute('data-action');const id=t.getAttribute('data-id');
   const find=(arr)=>arr.find(x=>x.id===id);
   switch(a){
-    case 'tab':UI.tab=t.getAttribute('data-tab');renderTab();break;
+    case 'tab':UI.tab=t.getAttribute('data-tab');closeSheet();renderTab();break;
     case 'goto-team':UI.tab='team';renderTab();break;
     case 'refresh':softRefresh();break;
+    case 'open-add':addChooser();break;
     case 'aria-filter':UI.ariaFilter=t.getAttribute('data-f');renderTab();break;
     case 'case-seg':UI.caseSeg=t.getAttribute('data-s');renderTab();break;
+    case 'health-seg':UI.healthSeg=t.getAttribute('data-s');renderTab();break;
     case 'add-moment':momentModal(null);break;
     case 'open-moment':momentModal(find(COL.moments));break;
     case 'save-moment':saveMoment();break;
@@ -806,19 +1174,38 @@ document.addEventListener('click',e=>{
     case 'open-doc':docModal(find(COL.docs));break;
     case 'save-doc':saveDoc();break;
     case 'del-doc':delRow('documents',loadDocs);break;
-    case 'add-person':personModal(null,t.getAttribute('data-kind'));break;
+    case 'add-person':personModal(null,t.getAttribute('data-kind')||'caseteam');break;
     case 'open-person':personModal(find(COL.people));break;
     case 'save-person':savePerson();break;
     case 'del-person':delRow('people',loadPeople);break;
+    case 'add-provider':providerModal(null);break;
+    case 'open-provider':providerModal(find(COL.providers));break;
+    case 'save-provider':saveProvider();break;
+    case 'del-provider':delRow('providers',loadProviders);break;
+    case 'add-med':medModal(null);break;
+    case 'open-med':medModal(find(COL.medications));break;
+    case 'save-med':saveMed();break;
+    case 'del-med':delRow('medications',loadMeds);break;
+    case 'add-expense':expenseModal(null);break;
+    case 'open-expense':expenseModal(find(COL.expenses));break;
+    case 'save-expense':saveExpense();break;
+    case 'del-expense':delRow('expenses',loadExpenses);break;
+    case 'expense-report':expenseReport();break;
     case 'open-packet':packetModal();break;
     case 'gen-packet':genPacket();break;
     case 'close-packet':$('packetView').style.display='none';$('packetView').innerHTML='';break;
     case 'print-packet':window.print();break;
     case 'pick-photo':pickPhoto();break;
-    case 'rm-photo':draftPhoto=null;{const s=$('photoSlot');if(s)s.innerHTML=photoSlotHTML();}break;
+    case 'rm-photo':draftPhotoPreview=null;draftPhotoBlob=null;draftPhotoKept=null;{const s=$('photoSlot');if(s)s.innerHTML=photoSlotHTML();}break;
     case 'toggle':t.classList.toggle('on');break;
     case 'copy-code':copyCode();break;
     case 'regen-code':regenCode();break;
+    case 'manage-member':manageMemberModal(id);break;
+    case 'save-member-role':saveMemberRole();break;
+    case 'remove-member':removeMember();break;
+    case 'leave-space':leaveSpace();break;
+    case 'push-on':enablePush();break;
+    case 'push-off':disablePush();break;
     case 'signout':signOut();break;
     case 'close':closeSheet();break;
   }
