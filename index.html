@@ -60,14 +60,31 @@
   .btn-sm{padding:8px 13px;font-size:13px;border-radius:11px;}
   .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:16px;}
   .caldow{text-align:center;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink-faint);padding:4px 0;}
-  .calcell{aspect-ratio:1;border-radius:11px;background:var(--bone);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:5px 0 0;position:relative;}
-  .calcell.has{cursor:pointer;border-color:var(--line-mid);}
+  .calcell{aspect-ratio:1;border-radius:11px;background:var(--bone);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:5px 0 0;position:relative;cursor:pointer;}
+  .calcell:active{transform:scale(.94);}
+  .calcell.has{border-color:var(--line-mid);}
   .calcell.today{background:var(--sage-soft);border-color:var(--sage);}
   .calcell .cnum{font-size:12.5px;font-weight:600;color:var(--ink-soft);}
   .calcell.today .cnum{color:var(--sage-deep);font-weight:700;}
   .cdots{display:flex;gap:2px;margin-top:3px;flex-wrap:wrap;justify-content:center;max-width:80%;}
   .cdot{width:5px;height:5px;border-radius:999px;display:inline-block;}
   .av.sm{width:30px;height:30px;font-size:12px;}
+  .attach-strip{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+  .attach-chip{position:relative;width:74px;display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;}
+  .attach-chip img,.attach-chip .ak{width:64px;height:64px;border-radius:12px;object-fit:cover;border:1px solid var(--line-mid);}
+  .attach-chip .ak{display:flex;align-items:center;justify-content:center;}
+  .ak-pdf{background:var(--terra-soft);color:var(--terra);}
+  .ak-video{background:#dfe7f0;color:#41618f;}
+  .ak-audio{background:var(--sage-soft);color:var(--sage-deep);}
+  .ak-file{background:var(--cream-deep);color:var(--ink-soft);}
+  .attach-name{font-size:10px;color:var(--ink-faint);max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;}
+  .attach-rm{position:absolute;top:-6px;right:1px;width:20px;height:20px;border-radius:999px;background:var(--ink);color:var(--bone);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
+  .attach-add{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;border:1.5px dashed var(--line-mid);border-radius:13px;padding:12px;cursor:pointer;color:var(--ink-soft);font-size:13.5px;font-weight:600;}
+  .attach-add:active{transform:scale(.99);}
+  .attach-strip.ro .attach-chip{width:54px;} .attach-strip.ro img,.attach-strip.ro .ak{width:48px;height:48px;border-radius:10px;}
+  .attach-strip.ro .attach-name{max-width:52px;}
+  .dv-head{display:flex;align-items:center;gap:13px;margin-bottom:14px;}
+  .dv-actions{display:flex;gap:8px;margin-bottom:14px;}
   .icon-btn{width:36px;height:36px;border-radius:999px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
   .err{background:var(--terra-soft);color:var(--terra);border-radius:12px;padding:11px 13px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.45;}
   .ok{background:var(--sage-soft);color:var(--sage-deep);border-radius:12px;padding:11px 13px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.45;}
@@ -245,6 +262,10 @@ const I = {
   wallet:'<path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2H3Z"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2H3"/><circle cx="17" cy="13" r="1.3"/>',
   calgrid:'<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4M7.5 13h.01M12 13h.01M16.5 13h.01M7.5 16.5h.01M12 16.5h.01"/>',
   dl:'<path d="M12 4v10M8 11l4 4 4-4"/><path d="M5 19h14"/>',
+  paperclip:'<path d="M21 8.5 12.3 17.2a4 4 0 0 1-5.7-5.7l8.5-8.5a2.7 2.7 0 0 1 3.8 3.8l-8.5 8.5a1.3 1.3 0 0 1-1.9-1.9l7.8-7.8"/>',
+  play:'<path d="M7 5l11 7-11 7Z"/>',
+  mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
 };
 function ic(n,s,sw){s=s||18;sw=sw||1.8;return '<svg viewBox="0 0 24 24" width="'+s+'" height="'+s+'" fill="none" stroke="currentColor" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round">'+(I[n]||'')+'</svg>';}
 
@@ -284,8 +305,15 @@ function parseAmount(s){s=(s||'').replace(/[^0-9.]/g,'');const v=parseFloat(s);r
 
 /* ---------- state ---------- */
 let sb=null, session=null, household=null, profiles={};
-let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[],providers:[],medications:[],expenses:[]};
+let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[],providers:[],medications:[],expenses:[],attachments:[]};
 let UI={tab:'today',ariaFilter:'all',caseSeg:'visits',healthSeg:'providers',calMonth:null};
+let draftAttach=[]; // [{tmpId,file_kind,file_name,mime,size_bytes,blob,previewUrl}]
+// Tier limits. Base plan: images + PDF, modest per-file cap. Premium: adds video/audio, larger cap.
+const TIER={ plan:'base',
+  base:{ kinds:['image','pdf'], maxMB:10, label:'Base' },
+  premium:{ kinds:['image','pdf','video','audio'], maxMB:100, label:'Premium' } };
+function planCfg(){ return TIER[TIER.plan]||TIER.base; }
+function kindFromMime(m){ m=(m||'').toLowerCase(); if(m.startsWith('image/'))return 'image'; if(m.startsWith('video/'))return 'video'; if(m.startsWith('audio/'))return 'audio'; if(m==='application/pdf')return 'pdf'; return 'file'; }
 let editId=null, modalOpen=false, pollTimer=null;
 let signedCache={}, myRole=null;
 let draftPhotoPreview=null, draftPhotoBlob=null, draftPhotoKept=null;
@@ -342,7 +370,7 @@ async function resolveHousehold(){
   return null;
 }
 async function loadAll(){
-  await Promise.all([loadProfiles(),loadMembers(),loadMoments(),loadContacts(),loadAppts(),loadDocs(),loadPeople(),loadProviders(),loadMeds(),loadExpenses()]);
+  await Promise.all([loadProfiles(),loadMembers(),loadMoments(),loadContacts(),loadAppts(),loadDocs(),loadPeople(),loadProviders(),loadMeds(),loadExpenses(),loadAttachments()]);
   myRole=(COL.members.find(m=>m.user_id===session.user.id)||{}).role||null;
   await prepareSignedUrls();
 }
@@ -352,6 +380,7 @@ async function prepareSignedUrls(){
   COL.moments.forEach(m=>{if(isPath(m.photo))paths.push(m.photo);});
   COL.docs.forEach(d=>{if(isPath(d.file))paths.push(d.file);});
   COL.expenses.forEach(e=>{if(isPath(e.receipt))paths.push(e.receipt);});
+  COL.attachments.forEach(at=>{if(isPath(at.storage_path))paths.push(at.storage_path);});
   const need=[...new Set(paths)].filter(p=>!signedCache[p]);
   if(!need.length)return;
   try{
@@ -409,6 +438,11 @@ async function loadExpenses(){
   const {data,error}=await sb.from('expenses').select('*').eq('household_id',household.id).order('spent_on',{ascending:false});
   if(error) throw error; COL.expenses=data||[];
 }
+async function loadAttachments(){
+  const {data,error}=await sb.from('attachments').select('*').eq('household_id',household.id).order('created_at',{ascending:true});
+  if(error) throw error; COL.attachments=data||[];
+}
+function attachmentsFor(type,id){ return COL.attachments.filter(a=>a.record_type===type&&a.record_id===id); }
 
 /* ---------- login / onboard (unchanged scaffold) ---------- */
 function brandRow(){return '<div class="brand"><div class="mark"><svg viewBox="0 0 24 24" width="16" height="16" fill="#F7F2E7" stroke="#F7F2E7" stroke-width="1.5">'+I.heart+'</svg></div><span class="name">tend</span><span class="tag">Kinship</span></div>';}
@@ -627,6 +661,7 @@ function contactCard(c){
     +'<p class="tiny muted" style="margin-top:3px">'+esc(fmtLong(c.occurred_on))+(c.occurred_time?' \u00b7 '+fmtTime(c.occurred_time):'')+(c.with_whom?' \u00b7 '+esc(c.with_whom):'')+(c.supervised?' \u00b7 supervised':'')+'</p>'
     +(c.what_happened?'<p class="tiny" style="margin-top:7px;line-height:1.5;color:'+C.ink+'">'+esc(oneLine(c.what_happened))+'</p>':'')
     +(c.flagged&&c.concern_note?'<p class="tiny" style="margin-top:6px;line-height:1.5;color:'+C.terra+'"><b>Concern:</b> '+esc(oneLine(c.concern_note))+'</p>':'')
+    +attachThumbs('contact',c.id)
     +((c.behavior_before||c.behavior_after)?'<div class="tiny faint" style="margin-top:6px;display:flex;gap:14px;flex-wrap:wrap">'+(c.behavior_before?'<span>Before: '+esc(oneLine(c.behavior_before)).slice(0,30)+'</span>':'')+(c.behavior_after?'<span>After: '+esc(oneLine(c.behavior_after)).slice(0,30)+'</span>':'')+'</div>':'')
     +'</div></div></div>';
 }
@@ -757,10 +792,11 @@ function providerCard(p){
 }
 function medCard(m){
   const k=MED_KINDS[m.kind]||MED_KINDS.other;const refillSoon=m.refill_date&&daysUntil(m.refill_date)!=null&&daysUntil(m.refill_date)<=7&&daysUntil(m.refill_date)>=0;
+  const presc=(m.prescriber_id&&(COL.providers.find(p=>p.id===m.prescriber_id)||{}).name)||m.prescriber;
   return '<div class="card" data-action="open-med" data-id="'+m.id+'" style="cursor:pointer;padding:13px 14px;opacity:'+(m.active?'1':'.7')+'"><div class="row">'
     +'<div class="ad" style="width:40px;height:40px;border-radius:12px;background:'+C.sageSoft+';color:'+C.sageDeep+'">'+ic(k.i,18)+'</div>'
-    +'<div class="grow"><p style="font-weight:600;font-size:14px">'+esc(m.name)+(m.dose?' \u00b7 '+esc(m.dose):'')+'</p><p class="tiny faint" style="margin-top:2px">'+esc([m.schedule,m.prescriber].filter(Boolean).join(' \u00b7 ')||k.l)+(m.refill_date?' \u00b7 refill '+fmt(m.refill_date):'')+'</p></div>'
-    +(refillSoon?'<span class="pill" style="background:'+C.terraSoft+';color:'+C.terra+'">refill soon</span>':'')+'</div></div>';
+    +'<div class="grow"><p style="font-weight:600;font-size:14px">'+esc(m.name)+(m.dose?' \u00b7 '+esc(m.dose):'')+'</p><p class="tiny faint" style="margin-top:2px">'+esc([m.schedule,presc].filter(Boolean).join(' \u00b7 ')||k.l)+(m.refill_date?' \u00b7 refill '+fmt(m.refill_date):'')+'</p></div>'
+    +(refillSoon?'<span class="pill" style="background:'+C.terraSoft+';color:'+C.terra+'">refill soon</span>':'')+'</div>'+attachThumbs('medication',m.id)+'</div>';
 }
 
 /* =========================================================
@@ -817,7 +853,7 @@ function screenCalendar(){
   for(let d=1;d<=days;d++){
     const ds=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
     const list=apptsOn(ds);const isToday=ds===todayS;
-    h+='<div class="calcell'+(isToday?' today':'')+(list.length?' has':'')+'" '+(list.length?'data-action="cal-day" data-d="'+ds+'"':'')+'>'
+    h+='<div class="calcell'+(isToday?' today':'')+(list.length?' has':'')+'" data-action="cal-day" data-d="'+ds+'">'
       +'<span class="cnum">'+d+'</span>'
       +(list.length?'<div class="cdots">'+list.slice(0,3).map(a=>'<span class="cdot" style="background:'+((APPT_KINDS[a.kind]||APPT_KINDS.other).c)+'"></span>').join('')+'</div>':'')
       +'</div>';
@@ -903,7 +939,7 @@ function openSheet(inner){
   requestAnimationFrame(()=>{const s=$('scrim');if(s)s.classList.add('show');});
   $('scrim').addEventListener('click',e=>{if(e.target.id==='scrim')closeSheet();});
 }
-function closeSheet(){const s=$('scrim');modalOpen=false;draftPhotoPreview=null;draftPhotoBlob=null;draftPhotoKept=null;editId=null;if(!s)return;s.classList.remove('show');setTimeout(()=>{$('modalRoot').innerHTML='';},200);}
+function closeSheet(){const s=$('scrim');modalOpen=false;draftPhotoPreview=null;draftPhotoBlob=null;draftPhotoKept=null;draftAttach=[];editId=null;if(!s)return;s.classList.remove('show');setTimeout(()=>{$('modalRoot').innerHTML='';},200);}
 function val(id){const e=$(id);return e?e.value.trim():'';}
 function sw(id){const e=$(id);return e?e.classList.contains('on'):false;}
 function actionsRow(saveAct,delAct){return '<div class="sheet-actions">'+(delAct?'<button class="btn btn-ghost" style="color:'+C.terra+';flex:0 0 auto" data-action="'+delAct+'">'+ic('trash',16)+'</button>':'')+'<button class="btn btn-ghost grow" data-action="close">Cancel</button><button class="btn btn-primary grow" data-action="'+saveAct+'">Save</button></div>';}
@@ -954,13 +990,14 @@ function contactModal(c){
   h+='<label class="fld"><span>What happened</span><textarea id="c_what" placeholder="Visit ran 45 min, warm goodbye\u2026">'+esc(c?c.what_happened:'')+'</textarea></label>';
   h+='<div class="togglerow" style="background:'+C.terraSoft+';border-color:transparent"><span class="lab" style="color:'+C.terra+'">Flag a concern</span><div class="switch '+(c&&c.flagged?'on':'')+'" data-action="toggle-concern" id="c_flag"><i></i></div></div>';
   h+='<div id="concernWrap" style="display:'+(c&&c.flagged?'block':'none')+'"><label class="fld"><span>What\u2019s the concern?</span><textarea id="c_concern" placeholder="Briefly, what felt off \u2014 so it\u2019s captured in your words\u2026">'+esc(c?c.concern_note:'')+'</textarea></label></div>';
+  h+=attachField('contact',c?c.id:null);
   h+='<div id="cErr"></div>'+actionsRow('save-contact',c?'del-contact':null);
   openSheet(h);bindPickers();
 }
 async function saveContact(){
   const o={kind:val('c_kind'),with_whom:val('c_with'),person_id:val('c_person')||null,occurred_on:val('c_date')||todayStr(),occurred_time:val('c_time')||null,supervised:sw('c_sup'),behavior_before:val('c_before'),behavior_after:val('c_after'),what_happened:val('c_what'),flagged:sw('c_flag'),concern_note:sw('c_flag')?val('c_concern'):null};
-  if(!o.what_happened&&!o.behavior_before&&!o.behavior_after&&!o.with_whom){$('cErr').innerHTML='<div class="err">Add at least a note or who it was with.</div>';return;}
-  await saveRow('contacts',o,loadContacts);
+  if(!o.what_happened&&!o.behavior_before&&!o.behavior_after&&!o.with_whom&&!draftAttach.length){$('cErr').innerHTML='<div class="err">Add at least a note, who it was with, or an attachment.</div>';return;}
+  await saveRowWithAttach('contacts','contact',o,loadContacts,'cErr');
 }
 
 /* APPT */
@@ -992,6 +1029,15 @@ function docModal(d){
   h+='<label class="fld"><span>Category</span><select id="d_cat">'+DOC_CATS.map(c=>'<option '+((d&&d.category===c)?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label>';
   h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Date on doc</span><input type="date" id="d_date" value="'+(d?d.doc_date||'':'')+'"></label><label class="fld grow"><span>Who holds it</span><input type="text" id="d_holder" placeholder="You / DCS / school" value="'+esc(d?d.holder:'')+'"></label></div>';
   h+='<label class="fld"><span>Notes</span><textarea id="d_notes" placeholder="Where the original lives, what it\u2019s for\u2026">'+esc(d?d.notes:'')+'</textarea></label>';
+  // optional: file this document under a provider or a case-team person
+  const provs2=COL.providers.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const team=COL.people.filter(p=>p.kind==='caseteam').slice().sort((a,b)=>a.name.localeCompare(b.name));
+  if(provs2.length||team.length){
+    let linkOpts='<option value="">\u2014 not linked \u2014</option>';
+    if(provs2.length)linkOpts+='<optgroup label="Providers">'+provs2.map(p=>'<option value="pr:'+p.id+'" '+((d&&d.provider_id===p.id)?'selected':'')+'>'+esc(p.name)+'</option>').join('')+'</optgroup>';
+    if(team.length)linkOpts+='<optgroup label="Case team">'+team.map(p=>'<option value="pe:'+p.id+'" '+((d&&d.person_id===p.id)?'selected':'')+'>'+esc(p.name)+'</option>').join('')+'</optgroup>';
+    h+='<label class="fld"><span>File under <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><select id="d_link">'+linkOpts+'</select></label>';
+  } else { h+='<input type="hidden" id="d_link" value="">'; }
   h+='<div id="photoSlot">'+photoSlotHTML('Photo or scan of the document')+'</div>';
   h+='<div id="dErr"></div>'+actionsRow('save-doc',d?'del-doc':null);
   openSheet(h);
@@ -999,7 +1045,10 @@ function docModal(d){
 async function saveDoc(){
   const name=val('d_name');if(!name){$('dErr').innerHTML='<div class="err">Give the document a name.</div>';return;}
   let file;try{file=await uploadDraftPhoto();}catch(e){$('dErr').innerHTML='<div class="err">File upload failed: '+esc(e.message||'')+'</div>';return;}
-  const o={name,category:val('d_cat')||'Other',doc_date:val('d_date')||null,holder:val('d_holder'),notes:val('d_notes'),file};
+  const link=val('d_link')||'';
+  const provider_id=link.indexOf('pr:')===0?link.slice(3):null;
+  const person_id=link.indexOf('pe:')===0?link.slice(3):null;
+  const o={name,category:val('d_cat')||'Other',doc_date:val('d_date')||null,holder:val('d_holder'),notes:val('d_notes'),file,provider_id,person_id};
   await saveRow('documents',o,loadDocs);
 }
 
@@ -1025,6 +1074,47 @@ async function savePerson(){
 }
 
 /* PROVIDER */
+function providerDetail(p){
+  if(!p)return;
+  const k=PROVIDER_KINDS[p.kind]||PROVIDER_KINDS.other;
+  const meds=COL.medications.filter(m=>m.prescriber_id===p.id);
+  const docs=COL.docs.filter(d=>d.provider_id===p.id);
+  let h='<div class="dv-head"><div class="ad" style="width:48px;height:48px;border-radius:14px;background:'+C.terraSoft+';color:'+C.terra+'">'+ic(k.i,22)+'</div>'
+    +'<div class="grow"><h2 style="margin:0">'+esc(p.name)+'</h2><p class="tiny faint" style="margin-top:3px">'+esc([k.l,p.specialty,p.org].filter(Boolean).join(' \u00b7 '))+'</p></div></div>';
+  h+='<div class="dv-actions">'+(p.phone?'<a class="btn btn-soft grow" href="tel:'+esc(p.phone)+'">'+ic('phone',15)+'Call</a>':'')+'<button class="btn btn-ghost grow" data-action="edit-provider" data-id="'+p.id+'">'+ic('edit',15)+'Edit</button></div>';
+  if(p.phone||p.address)h+='<div class="card" style="margin-top:4px">'+(p.phone?'<p class="tiny"><b>Phone</b> \u00b7 '+esc(p.phone)+'</p>':'')+(p.address?'<p class="tiny" style="margin-top:6px"><b>Address</b> \u00b7 '+esc(p.address)+'</p>':'')+'</div>';
+  if(p.notes)h+='<div class="card" style="margin-top:10px"><p class="tiny" style="line-height:1.55">'+esc(p.notes)+'</p></div>';
+  // linked medications
+  h+='<p class="section-label">Medications prescribed'+(meds.length?' ('+meds.length+')':'')+'</p>';
+  if(!meds.length)h+='<p class="tiny faint" style="margin:0 0 6px">None linked yet. Link a medication to this provider from the medication form.</p>';
+  else h+=meds.map(medCard).join('');
+  // linked documents
+  h+='<p class="section-label">Documents'+(docs.length?' ('+docs.length+')':'')+'</p>';
+  if(!docs.length)h+='<p class="tiny faint" style="margin:0">None filed under this provider yet.</p>';
+  else h+=docs.map(docCard).join('');
+  openSheet(h);
+}
+function personDetail(p){
+  if(!p)return;
+  const appts=COL.appts.filter(a=>a.assigned_to===p.id);  // (case-team people aren't household users, so this is rarely set; kept for completeness)
+  const contacts=COL.contacts.filter(c=>c.person_id===p.id);
+  const docs=COL.docs.filter(d=>d.person_id===p.id);
+  const col=p.color||C.gold;
+  let h='<div class="dv-head"><span class="av" style="width:48px;height:48px;font-size:18px;background:'+col+'">'+initial(p.name)+'</span>'
+    +'<div class="grow"><h2 style="margin:0">'+esc(p.name)+'</h2><p class="tiny faint" style="margin-top:3px">'+esc([p.role,p.org].filter(Boolean).join(' \u00b7 ')||(p.kind==='caseteam'?'Case team':'Family'))+'</p></div></div>';
+  h+='<div class="dv-actions">'+(p.phone?'<a class="btn btn-soft grow" href="tel:'+esc(p.phone)+'">'+ic('phone',15)+'Call</a>':'')+(p.email?'<a class="btn btn-soft grow" href="mailto:'+esc(p.email)+'">'+ic('mail',15)+'Email</a>':'')+'<button class="btn btn-ghost grow" data-action="edit-person" data-id="'+p.id+'">'+ic('edit',15)+'Edit</button></div>';
+  // contacts/visits linked to this person
+  h+='<p class="section-label">Visits &amp; contact'+(contacts.length?' ('+contacts.length+')':'')+'</p>';
+  if(!contacts.length)h+='<p class="tiny faint" style="margin:0 0 6px">None linked yet. When logging a visit or contact, link this person.</p>';
+  else h+=contacts.map(contactCard).join('');
+  // documents filed under them
+  h+='<p class="section-label">Documents'+(docs.length?' ('+docs.length+')':'')+'</p>';
+  if(!docs.length)h+='<p class="tiny faint" style="margin:0">None filed under this person yet.</p>';
+  else h+=docs.map(docCard).join('');
+  openSheet(h);
+}
+
+/* PROVIDER edit */
 function providerModal(p){
   editId=p?p.id:null;const cur=p?p.kind:'doctor';
   const opts=Object.keys(PROVIDER_KINDS).map(k=>[k,PROVIDER_KINDS[k].l]);
@@ -1051,17 +1141,23 @@ function medModal(m){
   h+='<label class="fld"><span>Type</span></label>'+picker('md_kind',opts,cur);
   h+='<label class="fld"><span>Name</span><input type="text" id="md_name" placeholder="e.g. Amoxicillin, or \u201cReading glasses\u201d" value="'+esc(m?m.name:'')+'"></label>';
   h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Dose / strength</span><input type="text" id="md_dose" placeholder="250mg / -2.25" value="'+esc(m?m.dose:'')+'"></label><label class="fld grow"><span>Schedule</span><input type="text" id="md_sched" placeholder="Twice daily / as needed" value="'+esc(m?m.schedule:'')+'"></label></div>';
-  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Prescriber</span><input type="text" id="md_presc" placeholder="Dr. Brennan" value="'+esc(m?m.prescriber:'')+'"></label><label class="fld grow"><span>Pharmacy</span><input type="text" id="md_pharm" placeholder="CVS Bedford" value="'+esc(m?m.pharmacy:'')+'"></label></div>';
+  const provs=COL.providers.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  if(provs.length){
+    const prOpts=[['','\u2014 not linked \u2014']].concat(provs.map(p=>[p.id,p.name+(p.specialty?' ('+p.specialty+')':'')]));
+    h+='<label class="fld"><span>Prescriber <span class="faint" style="text-transform:none;letter-spacing:0">(link a provider)</span></span><select id="md_presc_id">'+prOpts.map(o=>'<option value="'+esc(o[0])+'" '+((m&&m.prescriber_id===o[0])?'selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></label>';
+  } else { h+='<input type="hidden" id="md_presc_id" value="">'; }
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Prescriber name '+(provs.length?'<span class="faint" style="text-transform:none;letter-spacing:0">(if not linked)</span>':'')+'</span><input type="text" id="md_presc" placeholder="Dr. Brennan" value="'+esc(m?m.prescriber:'')+'"></label><label class="fld grow"><span>Pharmacy</span><input type="text" id="md_pharm" placeholder="CVS Bedford" value="'+esc(m?m.pharmacy:'')+'"></label></div>';
   h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Started</span><input type="date" id="md_start" value="'+(m?m.start_date||'':'')+'"></label><label class="fld grow"><span>Refill / re-check</span><input type="date" id="md_refill" value="'+(m?m.refill_date||'':'')+'"></label></div>';
   h+='<label class="fld"><span>Notes</span><textarea id="md_notes" placeholder="With food, side effects to watch\u2026">'+esc(m?m.notes:'')+'</textarea></label>';
   h+='<div class="togglerow"><span class="lab">Currently active</span><div class="switch '+((m?m.active:true)?'on':'')+'" data-action="toggle" id="md_active"><i></i></div></div>';
+  h+=attachField('medication',m?m.id:null);
   h+='<div id="mdErr"></div>'+actionsRow('save-med',m?'del-med':null);
   openSheet(h);bindPickers();
 }
 async function saveMed(){
   const name=val('md_name');if(!name){$('mdErr').innerHTML='<div class="err">Add a name.</div>';return;}
-  const o={kind:val('md_kind'),name,dose:val('md_dose'),schedule:val('md_sched'),prescriber:val('md_presc'),pharmacy:val('md_pharm'),start_date:val('md_start')||null,refill_date:val('md_refill')||null,active:sw('md_active'),notes:val('md_notes')};
-  await saveRow('medications',o,loadMeds);
+  const o={kind:val('md_kind'),name,dose:val('md_dose'),schedule:val('md_sched'),prescriber:val('md_presc'),prescriber_id:val('md_presc_id')||null,pharmacy:val('md_pharm'),start_date:val('md_start')||null,refill_date:val('md_refill')||null,active:sw('md_active'),notes:val('md_notes')};
+  await saveRowWithAttach('medications','medication',o,loadMeds,'mdErr');
 }
 
 /* EXPENSE */
@@ -1115,6 +1211,17 @@ async function saveRow(table,payload,reload){
     closeSheet(); await reload(); renderTab();
   }catch(e){ const box=$('mErr')||$('cErr')||$('aErr')||$('dErr')||$('pErr'); if(box)box.innerHTML='<div class="err">'+esc(e.message||'Could not save.')+'</div>'; }
 }
+// Like saveRow, but for records that can carry attachments: captures the row id,
+// uploads any draft files, then closes/reloads. errBox = id of the modal's error div.
+async function saveRowWithAttach(table,recordType,payload,reload,errBox){
+  try{
+    let recId=editId;
+    if(editId){const {error}=await sb.from(table).update(payload).eq('id',editId);if(error)throw error;}
+    else{payload.household_id=household.id;const {data,error}=await sb.from(table).insert(payload).select('id').single();if(error)throw error;recId=data&&data.id;}
+    if(recId&&draftAttach.length){ await commitAttachments(recordType,recId); }
+    closeSheet(); await reload(); await loadAttachments(); renderTab();
+  }catch(e){ const box=$(errBox)||$('cErr'); if(box)box.innerHTML='<div class="err">'+esc(e.message||'Could not save.')+'</div>'; }
+}
 async function delRow(table,reload){
   if(!editId)return;if(!confirm('Delete this? This cannot be undone.'))return;
   try{const {error}=await sb.from(table).delete().eq('id',editId);if(error)throw error;closeSheet();await reload();renderTab();}
@@ -1153,6 +1260,90 @@ function genPacket(){
 }
 function pkSec(t,items){if(!items.length)return'';return '<div class="pk-sec"><h3>'+esc(t)+'</h3>'+items.join('')+'</div>';}
 function pkItem(date,body){return '<div class="pk-item"><span class="d">'+esc(date)+'</span><div style="margin-top:2px">'+body+'</div></div>';}
+
+/* ---------- ATTACHMENTS ENGINE (reusable across records) ---------- */
+const KIND_ICON={image:'cam',video:'play',audio:'mic',pdf:'file',file:'file'};
+// Field shown inside a modal. Existing attachments (edit mode) + draft (new uploads) + add control.
+function attachField(recordType,recordId){
+  const cfg=planCfg();
+  const accept=cfg.kinds.map(k=>k==='image'?'image/*':k==='video'?'video/*':k==='audio'?'audio/*':k==='pdf'?'application/pdf':'').filter(Boolean).join(',');
+  const existing=recordId?attachmentsFor(recordType,recordId):[];
+  let h='<label class="fld"><span>Attachments <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span></label>';
+  h+='<div id="attachStrip" class="attach-strip">';
+  existing.forEach(a=>{h+=attachChip(a,false);});
+  draftAttach.forEach(d=>{h+=attachChip(d,true);});
+  h+='</div>';
+  h+='<div class="attach-add" data-action="pick-attach"><span>'+ic('paperclip',16)+'Add photo, PDF'+(cfg.kinds.indexOf('video')>=0?', video, audio':'')+'</span>'
+    +'<input type="file" id="attachInput" accept="'+accept+'" multiple style="display:none"></div>';
+  h+='<p class="tiny faint" style="margin-top:7px;line-height:1.45">'+cfg.label+' plan \u00b7 up to '+cfg.maxMB+'MB each.'
+    +(cfg.kinds.indexOf('video')<0?' Video &amp; audio are available on the premium plan.':'')
+    +(cfg.kinds.indexOf('audio')>=0?'<br>Only attach recordings you\u2019re lawfully allowed to keep \u2014 consent laws vary by state.':'')+'</p>';
+  return h;
+}
+function attachChip(a,isDraft){
+  const kind=a.file_kind||'file';
+  const ic2=KIND_ICON[kind]||'file';
+  const id=isDraft?a.tmpId:a.id;
+  let thumb;
+  if(kind==='image'){ const src=isDraft?a.previewUrl:photoSrc(a.storage_path); thumb='<img src="'+src+'" alt="">'; }
+  else thumb='<div class="ak ak-'+kind+'">'+ic(ic2,18)+'</div>';
+  return '<div class="attach-chip">'+thumb
+    +'<button class="attach-rm" data-action="'+(isDraft?'rm-draft-attach':'rm-attach')+'" data-id="'+id+'">'+ic('x',13)+'</button>'
+    +'<span class="attach-name">'+esc((isDraft?a.file_name:a.file_name)||kind)+'</span></div>';
+}
+function pickAttach(){
+  const inp=$('attachInput'); if(!inp)return;
+  inp.onchange=()=>{
+    const files=Array.from(inp.files||[]); const cfg=planCfg();
+    files.forEach(f=>{
+      const kind=kindFromMime(f.type);
+      if(cfg.kinds.indexOf(kind)<0){ alert((kind==='video'||kind==='audio')?'Video and audio uploads are part of the premium plan. Photos and PDFs are included on your current plan.':'That file type isn\u2019t supported.'); return; }
+      if(f.size>cfg.maxMB*1024*1024){ alert('"'+f.name+'" is larger than the '+cfg.maxMB+'MB limit on the '+cfg.label+' plan.'); return; }
+      if(kind==='image'){ compressImage(f,(dataUrl,blob)=>{ draftAttach.push({tmpId:uid(),file_kind:'image',file_name:f.name,mime:'image/jpeg',size_bytes:(blob&&blob.size)||f.size,blob:blob||f,previewUrl:dataUrl}); redrawAttachStrip(); }); }
+      else { draftAttach.push({tmpId:uid(),file_kind:kind,file_name:f.name,mime:f.type,size_bytes:f.size,blob:f,previewUrl:null}); redrawAttachStrip(); }
+    });
+    inp.value='';
+  };
+  inp.click();
+}
+function redrawAttachStrip(){
+  const strip=$('attachStrip'); if(!strip)return;
+  // re-render: keep existing (data-existing) by leaving them; simplest is full re-render from current modal context is hard,
+  // so we just append draft chips not yet shown.
+  const shown=new Set(Array.from(strip.querySelectorAll('[data-id]')).map(b=>b.getAttribute('data-id')));
+  draftAttach.forEach(d=>{ if(!shown.has(d.tmpId)){ const tmp=document.createElement('div'); tmp.innerHTML=attachChip(d,true); strip.appendChild(tmp.firstChild); } });
+}
+function removeDraftAttach(tmpId){ draftAttach=draftAttach.filter(d=>d.tmpId!==tmpId); const strip=$('attachStrip'); if(strip){ const btn=strip.querySelector('[data-id="'+tmpId+'"]'); if(btn&&btn.parentNode)btn.parentNode.remove(); } }
+async function removeAttach(id){
+  if(!confirm('Remove this attachment?'))return;
+  const a=COL.attachments.find(x=>x.id===id); if(!a)return;
+  try{ await sb.from('attachments').delete().eq('id',id); try{await sb.storage.from('attachments').remove([a.storage_path]);}catch(e){} await loadAttachments(); const strip=$('attachStrip'); if(strip){const btn=strip.querySelector('[data-id="'+id+'"]'); if(btn&&btn.parentNode)btn.parentNode.remove();} }
+  catch(e){ alert('Could not remove: '+(e.message||e)); }
+}
+// Called by save functions: upload all draft files and insert attachment rows for the saved record.
+async function commitAttachments(recordType,recordId){
+  if(!draftAttach.length)return;
+  for(const d of draftAttach){
+    try{
+      const ext=d.file_kind==='image'?'jpg':(d.file_name&&d.file_name.indexOf('.')>=0?d.file_name.split('.').pop().slice(0,5):d.file_kind);
+      const path=household.id+'/'+recordType+'/'+uid()+'.'+ext;
+      const {error}=await sb.storage.from('attachments').upload(path,d.blob,{contentType:d.mime||'application/octet-stream',upsert:false});
+      if(error)throw error;
+      await sb.from('attachments').insert({household_id:household.id,record_type:recordType,record_id:recordId,storage_path:path,file_kind:d.file_kind,file_name:d.file_name,mime:d.mime,size_bytes:d.size_bytes});
+    }catch(e){ /* skip a failed file but keep going */ }
+  }
+  draftAttach=[];
+  await loadAttachments();
+}
+// Read-only display of a record's attachments (on cards / detail).
+function attachThumbs(recordType,recordId){
+  const list=attachmentsFor(recordType,recordId); if(!list.length)return '';
+  return '<div class="attach-strip ro" style="margin-top:9px">'+list.map(a=>{
+    const kind=a.file_kind||'file';
+    if(kind==='image'){return '<a class="attach-chip ro" href="'+photoSrc(a.storage_path)+'" target="_blank" rel="noopener"><img src="'+photoSrc(a.storage_path)+'" alt=""></a>';}
+    return '<a class="attach-chip ro" href="'+photoSrc(a.storage_path)+'" target="_blank" rel="noopener"><div class="ak ak-'+kind+'">'+ic(KIND_ICON[kind]||'file',16)+'</div><span class="attach-name">'+esc(a.file_name||kind)+'</span></a>';
+  }).join('')+'</div>';
+}
 
 /* ---------- PHOTO (uploads to Supabase Storage) ---------- */
 function photoSlotHTML(label){
@@ -1275,7 +1466,7 @@ document.addEventListener('click',e=>{
     case 'health-seg':UI.healthSeg=t.getAttribute('data-s');renderTab();break;
     case 'cal-prev':{const [y,m]=UI.calMonth.split('-').map(Number);const d=new Date(y,m-2,1);UI.calMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');renderTab();break;}
     case 'cal-next':{const [y,m]=UI.calMonth.split('-').map(Number);const d=new Date(y,m,1);UI.calMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');renderTab();break;}
-    case 'cal-day':calDayModal(t.getAttribute('data-d'));break;
+    case 'cal-day':{const ds=t.getAttribute('data-d');if(apptsOn(ds).length)calDayModal(ds);else apptModal(null,ds);break;}
     case 'ics-appt':{const a=COL.appts.find(x=>x.id===id);if(a)downloadICS(a);break;}
     case 'add-moment':momentModal(null);break;
     case 'open-moment':momentModal(find(COL.moments));break;
@@ -1295,11 +1486,13 @@ document.addEventListener('click',e=>{
     case 'save-doc':saveDoc();break;
     case 'del-doc':delRow('documents',loadDocs);break;
     case 'add-person':personModal(null,t.getAttribute('data-kind')||'caseteam');break;
-    case 'open-person':personModal(find(COL.people));break;
+    case 'open-person':personDetail(find(COL.people));break;
+    case 'edit-person':personModal(COL.people.find(x=>x.id===id));break;
     case 'save-person':savePerson();break;
     case 'del-person':delRow('people',loadPeople);break;
     case 'add-provider':providerModal(null);break;
-    case 'open-provider':providerModal(find(COL.providers));break;
+    case 'open-provider':providerDetail(find(COL.providers));break;
+    case 'edit-provider':providerModal(COL.providers.find(x=>x.id===id));break;
     case 'save-provider':saveProvider();break;
     case 'del-provider':delRow('providers',loadProviders);break;
     case 'add-med':medModal(null);break;
@@ -1318,6 +1511,9 @@ document.addEventListener('click',e=>{
     case 'pick-photo':pickPhoto();break;
     case 'rm-photo':draftPhotoPreview=null;draftPhotoBlob=null;draftPhotoKept=null;{const s=$('photoSlot');if(s)s.innerHTML=photoSlotHTML();}break;
     case 'toggle':t.classList.toggle('on');break;
+    case 'pick-attach':pickAttach();break;
+    case 'rm-draft-attach':removeDraftAttach(id);break;
+    case 'rm-attach':removeAttach(id);break;
     case 'toggle-concern':{t.classList.toggle('on');const w=$('concernWrap');if(w)w.style.display=t.classList.contains('on')?'block':'none';break;}
     case 'copy-code':copyCode();break;
     case 'regen-code':regenCode();break;
