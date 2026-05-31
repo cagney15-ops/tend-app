@@ -58,6 +58,16 @@
   .btn-ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--line-mid);}
   .btn-block{width:100%;}
   .btn-sm{padding:8px 13px;font-size:13px;border-radius:11px;}
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:16px;}
+  .caldow{text-align:center;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink-faint);padding:4px 0;}
+  .calcell{aspect-ratio:1;border-radius:11px;background:var(--bone);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:5px 0 0;position:relative;}
+  .calcell.has{cursor:pointer;border-color:var(--line-mid);}
+  .calcell.today{background:var(--sage-soft);border-color:var(--sage);}
+  .calcell .cnum{font-size:12.5px;font-weight:600;color:var(--ink-soft);}
+  .calcell.today .cnum{color:var(--sage-deep);font-weight:700;}
+  .cdots{display:flex;gap:2px;margin-top:3px;flex-wrap:wrap;justify-content:center;max-width:80%;}
+  .cdot{width:5px;height:5px;border-radius:999px;display:inline-block;}
+  .av.sm{width:30px;height:30px;font-size:12px;}
   .icon-btn{width:36px;height:36px;border-radius:999px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
   .err{background:var(--terra-soft);color:var(--terra);border-radius:12px;padding:11px 13px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.45;}
   .ok{background:var(--sage-soft);color:var(--sage-deep);border-radius:12px;padding:11px 13px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.45;}
@@ -233,6 +243,8 @@ const I = {
   receipt:'<path d="M5 3v18l2-1.2L9 21l2-1.2L13 21l2-1.2L17 21l2-1.2V3l-2 1.2L15 3l-2 1.2L11 3 9 4.2 7 3Z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   dollar:'<path d="M12 2v20"/><path d="M17 6.5C17 4.6 14.8 3.5 12 3.5S7 4.8 7 7s2.5 3 5 3.5 5 1.2 5 3.5-2.2 3.5-5 3.5S7 19.4 7 17.5"/>',
   wallet:'<path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2H3Z"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2H3"/><circle cx="17" cy="13" r="1.3"/>',
+  calgrid:'<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4M7.5 13h.01M12 13h.01M16.5 13h.01M7.5 16.5h.01M12 16.5h.01"/>',
+  dl:'<path d="M12 4v10M8 11l4 4 4-4"/><path d="M5 19h14"/>',
 };
 function ic(n,s,sw){s=s||18;sw=sw||1.8;return '<svg viewBox="0 0 24 24" width="'+s+'" height="'+s+'" fill="none" stroke="currentColor" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round">'+(I[n]||'')+'</svg>';}
 
@@ -273,7 +285,7 @@ function parseAmount(s){s=(s||'').replace(/[^0-9.]/g,'');const v=parseFloat(s);r
 /* ---------- state ---------- */
 let sb=null, session=null, household=null, profiles={};
 let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[],providers:[],medications:[],expenses:[]};
-let UI={tab:'today',ariaFilter:'all',caseSeg:'visits',healthSeg:'providers'};
+let UI={tab:'today',ariaFilter:'all',caseSeg:'visits',healthSeg:'providers',calMonth:null};
 let editId=null, modalOpen=false, pollTimer=null;
 let signedCache={}, myRole=null;
 let draftPhotoPreview=null, draftPhotoBlob=null, draftPhotoKept=null;
@@ -487,7 +499,7 @@ function renderApp(){
 function renderNav(){
   const nav=$('navbar'); nav.style.display='flex';
   const tabs=[['today','home','Today'],['child','heart',childName().split(' ')[0]||'Child'],['case','scale','Case'],['health','cross','Health'],['more','folder','More']];
-  const moreTabs=['docs','money','team'];
+  const moreTabs=['docs','money','team','calendar'];
   nav.innerHTML=tabs.map(t=>{const on=UI.tab===t[0]||(t[0]==='more'&&moreTabs.indexOf(UI.tab)>=0);return '<button class="'+(on?'on':'')+'" data-action="tab" data-tab="'+t[0]+'"><span style="display:flex">'+ic(t[1],21,on?2.2:1.7)+'</span><span>'+esc(t[2])+'</span></button>';}).join('');
 }
 function renderTab(){
@@ -496,6 +508,7 @@ function renderTab(){
   else if(UI.tab==='child')m.innerHTML=screenChild();
   else if(UI.tab==='case')m.innerHTML=screenCase();
   else if(UI.tab==='health')m.innerHTML=screenHealth();
+  else if(UI.tab==='calendar')m.innerHTML=screenCalendar();
   else if(UI.tab==='docs')m.innerHTML=screenDocs();
   else if(UI.tab==='money')m.innerHTML=screenMoney();
   else if(UI.tab==='more')m.innerHTML=screenMore();
@@ -618,11 +631,16 @@ function contactCard(c){
 }
 function apptCard(a){
   const k=APPT_KINDS[a.kind]||APPT_KINDS.other;const du=daysUntil(a.appt_date);
-  return '<div class="card" data-action="open-appt" data-id="'+a.id+'" style="cursor:pointer;opacity:'+(a.done?'.7':'1')+'">'
-    +'<div class="row"><div class="ad" style="width:40px;height:40px;border-radius:12px;background:'+k.c+'1f;color:'+k.c+'">'+ic(a.done?'check':k.i,18)+'</div>'
+  const who=a.assigned_to?whoName(a.assigned_to).split(' ')[0]:null;
+  return '<div class="card" style="opacity:'+(a.done?'.7':'1')+'">'
+    +'<div class="row" data-action="open-appt" data-id="'+a.id+'" style="cursor:pointer"><div class="ad" style="width:40px;height:40px;border-radius:12px;background:'+k.c+'1f;color:'+k.c+'">'+ic(a.done?'check':k.i,18)+'</div>'
     +'<div class="grow"><p style="font-weight:600;font-size:14.5px">'+esc(a.title||k.l)+'</p>'
-    +'<p class="tiny muted" style="margin-top:3px">'+esc(fmtLong(a.appt_date))+(a.appt_time?' \u00b7 '+fmtTime(a.appt_time):'')+(a.location?' \u00b7 '+esc(a.location):'')+'</p></div>'
-    +(!a.done&&du!=null&&du>=0&&du<=3?'<span class="pill" style="background:'+C.terraSoft+';color:'+C.terra+'">soon</span>':'')+'</div></div>';
+    +'<p class="tiny muted" style="margin-top:3px">'+esc(fmtLong(a.appt_date))+(a.appt_time?' \u00b7 '+fmtTime(a.appt_time):'')+(a.location?' \u00b7 '+esc(a.location):'')+'</p>'
+    +(who?'<p class="tiny" style="margin-top:5px;color:'+C.sageDeep+';font-weight:600"><span class="av sm" style="width:16px;height:16px;font-size:9px;display:inline-flex;vertical-align:middle;margin-right:5px;background:'+C.sage+'">'+initial(who)+'</span>'+esc(who)+'</p>':'')
+    +'</div>'
+    +(!a.done&&du!=null&&du>=0&&du<=3?'<span class="pill" style="background:'+C.terraSoft+';color:'+C.terra+'">soon</span>':'')+'</div>'
+    +'<div class="row" style="margin-top:10px;gap:8px;justify-content:flex-end"><button class="btn btn-ghost btn-sm" data-action="ics-appt" data-id="'+a.id+'">'+ic('dl',15)+'Add to calendar</button></div>'
+    +'</div>';
 }
 
 /* ---------- DOCS ---------- */
@@ -774,9 +792,96 @@ function expenseCard(e){
 /* =========================================================
    MORE (hub for Docs, Money, Team)
 ========================================================= */
+/* =========================================================
+   CALENDAR  (B17/B18/B19)
+========================================================= */
+function upcomingCount(){return COL.appts.filter(a=>!a.done&&daysUntil(a.appt_date)!=null&&daysUntil(a.appt_date)>=0).length;}
+function ymdLocal(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function startOfWeek(d){const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-x.getDay());return x;}
+function apptsOn(dateStr){return COL.appts.filter(a=>a.appt_date===dateStr).sort((a,b)=>((a.appt_time||'')+'').localeCompare((b.appt_time||'')+''));}
+function screenCalendar(){
+  if(!UI.calMonth){const n=new Date();UI.calMonth=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0');}
+  const [y,m]=UI.calMonth.split('-').map(Number);
+  const first=new Date(y,m-1,1), startPad=first.getDay(), days=new Date(y,m,0).getDate();
+  const todayS=ymdLocal(new Date());
+  let h='<p class="eyebrow">Everyone on the same page</p><h1 class="title">Calendar.</h1>';
+  // month nav
+  h+='<div class="row" style="margin-top:16px;justify-content:space-between"><button class="icon-btn" style="background:var(--bone);border:1px solid var(--line-mid);color:var(--ink-soft)" data-action="cal-prev">'+ic('chevR',17).replace('m9 6 6 6-6 6','m15 6-6 6 6 6')+'</button>'
+    +'<p style="font-family:var(--serif);font-size:19px;font-weight:600">'+MON[m-1]+' '+y+'</p>'
+    +'<button class="icon-btn" style="background:var(--bone);border:1px solid var(--line-mid);color:var(--ink-soft)" data-action="cal-next">'+ic('chevR',17)+'</button></div>';
+  // grid
+  h+='<div class="calgrid">';
+  ['S','M','T','W','T','F','S'].forEach(d=>h+='<div class="caldow">'+d+'</div>');
+  for(let i=0;i<startPad;i++)h+='<div></div>';
+  for(let d=1;d<=days;d++){
+    const ds=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const list=apptsOn(ds);const isToday=ds===todayS;
+    h+='<div class="calcell'+(isToday?' today':'')+(list.length?' has':'')+'" '+(list.length?'data-action="cal-day" data-d="'+ds+'"':'')+'>'
+      +'<span class="cnum">'+d+'</span>'
+      +(list.length?'<div class="cdots">'+list.slice(0,3).map(a=>'<span class="cdot" style="background:'+((APPT_KINDS[a.kind]||APPT_KINDS.other).c)+'"></span>').join('')+'</div>':'')
+      +'</div>';
+  }
+  h+='</div>';
+  // this week — who's got what
+  const sow=startOfWeek(new Date());
+  const weekItems=[];
+  for(let i=0;i<7;i++){const dd=new Date(sow);dd.setDate(sow.getDate()+i);apptsOn(ymdLocal(dd)).forEach(a=>{if(!a.done)weekItems.push(a);});}
+  h+='<p class="section-label">This week \u00b7 who\u2019s got what</p>';
+  if(!weekItems.length){h+='<div class="card"><p class="tiny muted" style="margin:0">Nothing scheduled this week. Add an appointment and assign who\u2019s responsible \u2014 it\u2019ll show up here for everyone.</p></div>';}
+  else{
+    h+='<div class="card">'+weekItems.map(a=>{const k=APPT_KINDS[a.kind]||APPT_KINDS.other;const who=a.assigned_to?whoName(a.assigned_to).split(' ')[0]:null;
+      return '<div class="att" data-action="open-appt" data-id="'+a.id+'"><div class="ad" style="width:34px;height:34px;border-radius:11px;background:'+k.c+'1f;color:'+k.c+'">'+ic(k.i,16)+'</div>'
+      +'<div class="grow"><p style="font-size:14px;font-weight:600">'+esc(a.title||k.l)+'</p><p class="tiny faint" style="margin-top:2px">'+DOW[parseD(a.appt_date).getDay()]+(a.appt_time?' \u00b7 '+fmtTime(a.appt_time):'')+'</p></div>'
+      +(who?'<span class="chip" style="padding-left:5px"><span class="av sm" style="width:20px;height:20px;font-size:9px;background:'+C.sage+'">'+initial(who)+'</span>'+esc(who)+'</span>':'<span class="chip" style="color:'+C.terra+';border-color:'+C.terraSoft+'">Unassigned</span>')
+      +'</div>';}).join('')+'</div>';
+  }
+  h+='<button class="btn btn-soft btn-block" style="margin-top:12px" data-action="add-appt">'+ic('plus',17)+'Add an appointment</button>';
+  return h;
+}
+function calDayModal(ds){
+  const list=apptsOn(ds);
+  let h='<h2>'+esc(fmtLong(ds))+'</h2>';
+  if(!list.length){h+='<p class="glead">Nothing scheduled.</p>';}
+  else{h+='<div style="margin-top:4px">'+list.map(a=>{const k=APPT_KINDS[a.kind]||APPT_KINDS.other;const who=a.assigned_to?whoName(a.assigned_to).split(' ')[0]:null;
+    return '<div class="att" data-action="open-appt" data-id="'+a.id+'"><div class="ad" style="width:34px;height:34px;border-radius:11px;background:'+k.c+'1f;color:'+k.c+'">'+ic(k.i,16)+'</div>'
+    +'<div class="grow"><p style="font-size:14px;font-weight:600">'+esc(a.title||k.l)+'</p><p class="tiny faint" style="margin-top:2px">'+(a.appt_time?fmtTime(a.appt_time):'All day')+(a.location?' \u00b7 '+esc(a.location):'')+(who?' \u00b7 '+esc(who):'')+'</p></div>'
+    +'<button class="btn btn-ghost btn-sm" data-action="ics-appt" data-id="'+a.id+'">'+ic('dl',14)+'</button></div>';}).join('')+'</div>';}
+  h+='<div class="sheet-actions"><button class="btn btn-ghost grow" data-action="close">Close</button><button class="btn btn-primary grow" data-action="add-appt">Add appointment</button></div>';
+  openSheet(h);
+}
+function pad2(n){return String(n).padStart(2,'0');}
+function icsStamp(dateStr,timeStr){
+  // floating local time; if no time, all-day
+  const p=dateStr.split('-');
+  if(timeStr){const t=timeStr.split(':');return {dt:p[0]+pad2(p[1])+pad2(p[2])+'T'+pad2(t[0])+pad2(t[1])+'00',allday:false};}
+  return {dt:p[0]+pad2(p[1])+pad2(p[2]),allday:true};
+}
+function downloadICS(a){
+  const k=APPT_KINDS[a.kind]||APPT_KINDS.other;
+  const start=icsStamp(a.appt_date,a.appt_time);
+  let end='';
+  if(!start.allday){const p=a.appt_date.split('-');const t=(a.appt_time||'00:00').split(':');const d=new Date(+p[0],+p[1]-1,+p[2],+t[0],+t[1]);d.setHours(d.getHours()+1);end=d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+'T'+pad2(d.getHours())+pad2(d.getMinutes())+'00';}
+  const uidv=(a.id||uid())+'@tend';
+  const esc2=s=>(s||'').replace(/([,;\\])/g,'\\$1').replace(/\n/g,'\\n');
+  let body='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Tend//Kinship//EN\r\nBEGIN:VEVENT\r\nUID:'+uidv+'\r\nDTSTAMP:'+icsStamp(ymdLocal(new Date()),pad2(new Date().getHours())+':'+pad2(new Date().getMinutes())).dt+'\r\n';
+  if(start.allday){body+='DTSTART;VALUE=DATE:'+start.dt+'\r\n';}
+  else{body+='DTSTART:'+start.dt+'\r\nDTEND:'+end+'\r\n';}
+  body+='SUMMARY:'+esc2(a.title||k.l)+'\r\n';
+  if(a.location)body+='LOCATION:'+esc2(a.location)+'\r\n';
+  if(a.notes)body+='DESCRIPTION:'+esc2(a.notes)+'\r\n';
+  body+='END:VEVENT\r\nEND:VCALENDAR\r\n';
+  const blob=new Blob([body],{type:'text/calendar'});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;link.download=(a.title||k.l).replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'.ics';
+  document.body.appendChild(link);link.click();
+  setTimeout(()=>{document.body.removeChild(link);URL.revokeObjectURL(url);},500);
+}
+
 function screenMore(){
   let h='<p class="eyebrow">More</p><h1 class="title">More.</h1>';
   const items=[
+    ['calendar','calgrid',C.terra,C.terraSoft,'Calendar',upcomingCount()+' coming up'],
     ['docs','folder',C.sage,C.sageSoft,'Documents',COL.docs.length+' on file'],
     ['money','wallet',C.sageDeep,C.sageSoft,'Expenses',COL.expenses.length?dollars(COL.expenses.reduce((s,e)=>s+(e.amount_cents||0),0))+' logged':'nothing logged yet'],
     ['team','users',C.terra,C.terraSoft,'Team & settings',COL.members.length+(COL.members.length===1?' member':' members')]
@@ -859,13 +964,15 @@ function apptModal(a){
   h+='<label class="fld"><span>Title <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><input type="text" id="a_title" placeholder="e.g. Permanency hearing" value="'+esc(a?a.title:'')+'"></label>';
   h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Date</span><input type="date" id="a_date" value="'+(a?a.appt_date:todayStr())+'"></label><label class="fld grow"><span>Time</span><input type="time" id="a_time" value="'+(a?a.appt_time||'':'')+'"></label></div>';
   h+='<label class="fld"><span>Location</span><input type="text" id="a_loc" placeholder="Courtroom 2 / Bedford Children\u2019s\u2026" value="'+esc(a?a.location:'')+'"></label>';
+  const memOpts=[['','Unassigned']].concat(COL.members.map(mb=>[mb.user_id,whoName(mb.user_id).split(' ')[0]+(mb.user_id===session.user.id?' (you)':'')]));
+  h+='<label class="fld"><span>Who\u2019s responsible</span></label>'+picker('a_assigned',memOpts,a&&a.assigned_to?a.assigned_to:'');
   h+='<label class="fld"><span>Who / notes</span><textarea id="a_notes" placeholder="Bring updated visit log; GAL attending\u2026">'+esc(a?a.notes:'')+'</textarea></label>';
   h+='<div class="togglerow"><span class="lab">Already happened</span><div class="switch '+(a&&a.done?'on':'')+'" data-action="toggle" id="a_done"><i></i></div></div>';
   h+='<div id="aErr"></div>'+actionsRow('save-appt',a?'del-appt':null);
   openSheet(h);bindPickers();
 }
 async function saveAppt(){
-  const o={kind:val('a_kind'),title:val('a_title'),appt_date:val('a_date')||todayStr(),appt_time:val('a_time')||null,location:val('a_loc'),notes:val('a_notes'),done:sw('a_done')};
+  const o={kind:val('a_kind'),title:val('a_title'),appt_date:val('a_date')||todayStr(),appt_time:val('a_time')||null,location:val('a_loc'),notes:val('a_notes'),done:sw('a_done'),assigned_to:val('a_assigned')||null};
   await saveRow('appointments',o,loadAppts);
 }
 
@@ -1158,6 +1265,10 @@ document.addEventListener('click',e=>{
     case 'aria-filter':UI.ariaFilter=t.getAttribute('data-f');renderTab();break;
     case 'case-seg':UI.caseSeg=t.getAttribute('data-s');renderTab();break;
     case 'health-seg':UI.healthSeg=t.getAttribute('data-s');renderTab();break;
+    case 'cal-prev':{const [y,m]=UI.calMonth.split('-').map(Number);const d=new Date(y,m-2,1);UI.calMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');renderTab();break;}
+    case 'cal-next':{const [y,m]=UI.calMonth.split('-').map(Number);const d=new Date(y,m,1);UI.calMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');renderTab();break;}
+    case 'cal-day':calDayModal(t.getAttribute('data-d'));break;
+    case 'ics-appt':{const a=COL.appts.find(x=>x.id===id);if(a)downloadICS(a);break;}
     case 'add-moment':momentModal(null);break;
     case 'open-moment':momentModal(find(COL.moments));break;
     case 'save-moment':saveMoment();break;
