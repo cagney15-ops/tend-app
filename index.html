@@ -347,7 +347,7 @@ function glossaryCategory(c){return {role:'Roles & people',legal:'Legal',documen
 
 /* ---------- state ---------- */
 let sb=null, session=null, household=null, profiles={};
-let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[],providers:[],medications:[],expenses:[],attachments:[],tasks:[],glossary:[]};
+let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[],providers:[],medications:[],expenses:[],attachments:[],tasks:[],glossary:[],vitalDocs:[]};
 let UI={tab:'today',ariaFilter:'all',caseSeg:'visits',healthSeg:'providers',calMonth:null,glossQuery:''};
 let draftAttach=[]; // [{tmpId,file_kind,file_name,mime,size_bytes,blob,previewUrl}]
 let apptStash=null;  // holds in-progress appointment field values when adding a provider/person inline
@@ -409,13 +409,13 @@ async function route(){
 function hideNav(){ $('navbar').style.display='none'; }
 
 async function resolveHousehold(){
-  const {data,error}=await sb.from('memberships').select('role, households(id,label,child_first_name,invite_code,child_dob,placement_date,child_photo,school_name,grade,teacher_name,classes)');
+  const {data,error}=await sb.from('memberships').select('role, households(id,label,child_first_name,invite_code,child_dob,placement_date,child_photo,school_name,grade,teacher_name,classes,allergies,blood_type,medical_conditions,primary_physician,insurance_provider,insurance_id,medicaid_id,emergency_notes)');
   if(error) throw error;
   if(data&&data.length&&data[0].households) return data[0].households;
   return null;
 }
 async function loadAll(){
-  await Promise.all([loadProfiles(),loadMembers(),loadMoments(),loadContacts(),loadAppts(),loadDocs(),loadPeople(),loadProviders(),loadMeds(),loadExpenses(),loadAttachments(),loadTasks(),loadGlossary()]);
+  await Promise.all([loadProfiles(),loadMembers(),loadMoments(),loadContacts(),loadAppts(),loadDocs(),loadPeople(),loadProviders(),loadMeds(),loadExpenses(),loadAttachments(),loadTasks(),loadGlossary(),loadVitalDocs()]);
   myRole=(COL.members.find(m=>m.user_id===session.user.id)||{}).role||null;
   await prepareSignedUrls();
 }
@@ -495,6 +495,10 @@ async function loadTasks(){
 async function loadGlossary(){
   const {data,error}=await sb.from('glossary_terms').select('*').eq('household_id',household.id).order('term',{ascending:true});
   if(error) throw error; COL.glossary=data||[];
+}
+async function loadVitalDocs(){
+  const {data,error}=await sb.from('vital_documents').select('*').eq('household_id',household.id).order('sort_order',{ascending:true}).order('created_at',{ascending:true});
+  if(error) throw error; COL.vitalDocs=data||[];
 }
 function attachmentsFor(type,id){ return COL.attachments.filter(a=>a.record_type===type&&a.record_id===id); }
 
@@ -952,10 +956,15 @@ function addChooser(){
    HEALTH
 ========================================================= */
 function screenHealth(){
+  if(!['essentials','providers','meds'].includes(UI.healthSeg))UI.healthSeg='essentials';
   let h='<p class="eyebrow">Care, kept straight</p><h1 class="title">Health.</h1>';
-  h+='<div class="seg" style="margin-top:16px"><button class="'+(UI.healthSeg==='providers'?'on':'')+'" data-action="health-seg" data-s="providers">Providers</button>'
+  h+='<div class="seg" style="margin-top:16px">'
+    +'<button class="'+(UI.healthSeg==='essentials'?'on':'')+'" data-action="health-seg" data-s="essentials">Essentials</button>'
+    +'<button class="'+(UI.healthSeg==='providers'?'on':'')+'" data-action="health-seg" data-s="providers">Providers</button>'
     +'<button class="'+(UI.healthSeg==='meds'?'on':'')+'" data-action="health-seg" data-s="meds">Medications</button></div>';
-  if(UI.healthSeg==='providers'){
+  if(UI.healthSeg==='essentials'){
+    h+=essentialsSection();
+  } else if(UI.healthSeg==='providers'){
     h+='<button class="btn btn-primary btn-block" style="margin-top:14px" data-action="add-provider">'+ic('plus',18)+'Add a provider</button>';
     if(!COL.providers.length){h+='<div class="empty" style="margin-top:18px"><div class="ic">'+ic('cross',22)+'</div><h3>Her care team</h3><p>Pediatrician, dentist, eye doctor, therapist, pharmacy \u2014 names and numbers in one place, ready when you need them.</p><button class="btn btn-soft" data-action="add-provider">Add the first provider</button></div>';}
     else h+='<div style="margin-top:8px">'+COL.providers.map(providerCard).join('')+'</div>';
@@ -966,6 +975,55 @@ function screenHealth(){
     else{if(active.length)h+='<p class="section-label">Current</p>'+active.map(medCard).join('');if(past.length)h+='<p class="section-label">Past</p>'+past.map(medCard).join('');}
   }
   return h;
+}
+const VITAL_DOC_PRESETS=['Birth certificate','Social Security card','Placement / custody order','Medicaid / insurance card','Immunization records','School records','Photo ID'];
+function essentialsSection(){
+  const h0=household||{};
+  const nm=childName();
+  let h='';
+  // emergency card — allergies first, most prominent
+  const hasAny=h0.allergies||h0.blood_type||h0.medical_conditions||h0.primary_physician||h0.insurance_provider||h0.insurance_id||h0.medicaid_id||h0.emergency_notes;
+  h+='<div class="card" style="margin-top:14px;padding:0;overflow:hidden;border-color:'+(h0.allergies?C.terra:'var(--line)')+'">';
+  // allergy strip — high visibility if present
+  if(h0.allergies){
+    h+='<div style="background:'+C.terraSoft+';padding:11px 15px;display:flex;gap:9px;align-items:flex-start"><span style="color:'+C.terra+';display:flex;margin-top:1px">'+ic('alertT',17)+'</span><div><p class="tiny" style="font-weight:700;color:'+C.terra+';text-transform:uppercase;letter-spacing:.06em">Allergies</p><p style="font-size:14.5px;font-weight:600;margin-top:2px;line-height:1.4">'+esc(h0.allergies)+'</p></div></div>';
+  }
+  h+='<div class="row" data-action="edit-essentials" style="cursor:pointer;padding:13px 15px;align-items:center"><div class="ad" style="width:40px;height:40px;border-radius:11px;background:'+C.terraSoft+';color:'+C.terra+'">'+ic('pulse',18)+'</div>'
+    +'<div class="grow"><p style="font-weight:600;font-size:15px">Emergency & medical</p><p class="tiny faint" style="margin-top:2px">'+(hasAny?'Tap to view or update':'Tap to add allergies, blood type, insurance')+'</p></div><span class="faint">'+ic('edit',15)+'</span></div>';
+  if(hasAny){
+    h+='<div style="padding:2px 15px 14px">';
+    const row=(label,val)=>val?'<div style="display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--line)"><span class="tiny faint" style="min-width:108px;flex-shrink:0">'+label+'</span><span class="tiny" style="font-weight:600;line-height:1.4">'+esc(val)+'</span></div>':'';
+    h+=row('Blood type',h0.blood_type);
+    h+=row('Conditions',h0.medical_conditions);
+    h+=row('Primary doctor',h0.primary_physician);
+    h+=row('Insurance',h0.insurance_provider);
+    h+=row('Member ID',h0.insurance_id);
+    h+=row('Medicaid ID',h0.medicaid_id);
+    h+=row('Notes',h0.emergency_notes);
+    h+='</div>';
+  }
+  h+='</div>';
+  // vital documents checklist
+  h+='<div class="row" style="align-items:baseline;margin-top:18px"><p class="section-label" style="margin:0">Vital documents</p><button class="btn btn-ghost btn-sm" style="margin-left:auto" data-action="add-vitaldoc">'+ic('plus',14)+'Add</button></div>';
+  if(!COL.vitalDocs.length){
+    h+='<div class="card" style="padding:14px"><p class="tiny" style="line-height:1.5;color:'+C.inkSoft+'">Track where '+esc(nm)+'\u2019s key papers are \u2014 birth certificate, Social Security card, custody order, Medicaid card. You\u2019ll get asked for these constantly.</p>'
+      +'<div class="row" style="flex-wrap:wrap;gap:7px;margin-top:11px">'+VITAL_DOC_PRESETS.map(p=>'<button class="chip-add" data-action="quick-vitaldoc" data-label="'+esc(p)+'">'+ic('plus',12)+esc(p)+'</button>').join('')+'</div></div>';
+  } else {
+    h+='<div>'+COL.vitalDocs.map(vitalDocCard).join('')+'</div>';
+    // offer presets not yet added
+    const have=COL.vitalDocs.map(d=>d.label.toLowerCase());
+    const remaining=VITAL_DOC_PRESETS.filter(p=>!have.includes(p.toLowerCase()));
+    if(remaining.length)h+='<div class="row" style="flex-wrap:wrap;gap:7px;margin-top:10px">'+remaining.map(p=>'<button class="chip-add" data-action="quick-vitaldoc" data-label="'+esc(p)+'">'+ic('plus',12)+esc(p)+'</button>').join('')+'</div>';
+  }
+  return h;
+}
+const VDOC_STATUS={have:{l:'Have it',c:C.sageDeep,bg:C.sageSoft,i:'check'},need:{l:'Need it',c:C.terra,bg:C.terraSoft,i:'alertT'},requested:{l:'Requested',c:C.gold,bg:'rgba(200,160,85,.18)',i:'clock'}};
+function vitalDocCard(d){
+  const st=VDOC_STATUS[d.status]||VDOC_STATUS.need;
+  return '<div class="card" data-action="open-vitaldoc" data-id="'+d.id+'" style="cursor:pointer;padding:12px 14px;margin-bottom:8px"><div class="row">'
+    +'<div class="ad" style="width:34px;height:34px;border-radius:10px;background:'+st.bg+';color:'+st.c+'">'+ic(st.i,15)+'</div>'
+    +'<div class="grow"><p style="font-weight:600;font-size:14px">'+esc(d.label)+'</p>'+(d.location?'<p class="tiny faint" style="margin-top:2px">'+esc(d.location)+'</p>':'')+'</div>'
+    +'<span class="pill" style="background:'+st.bg+';color:'+st.c+'">'+st.l+'</span></div></div>';
 }
 function providerCard(p){
   const k=PROVIDER_KINDS[p.kind]||PROVIDER_KINDS.other;
@@ -1840,6 +1898,52 @@ async function saveEducation(){
     closeSheet();renderApp();
   }catch(e){const b=$('edErr');if(b)b.innerHTML='<div class="err">'+esc(e.message||'Could not save.')+'</div>';}
 }
+
+/* EMERGENCY & MEDICAL ESSENTIALS */
+function essentialsModal(){
+  const h0=household||{};
+  let h='<h2>Emergency &amp; medical</h2><p class="glead">The things you need in seconds at an ER or a new doctor. All optional \u2014 but allergies and insurance are the ones worth filling in first.</p>';
+  h+='<label class="fld"><span>Allergies <span class="faint" style="text-transform:none;letter-spacing:0">(shown prominently)</span></span><textarea id="es_allergies" placeholder="e.g. Penicillin, peanuts \u2014 or \u201cnone known\u201d">'+esc(h0.allergies||'')+'</textarea></label>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Blood type</span><input type="text" id="es_blood" placeholder="e.g. O+" value="'+esc(h0.blood_type||'')+'"></label><label class="fld grow"><span>Primary doctor</span><input type="text" id="es_doc" placeholder="Dr. \u2014" value="'+esc(h0.primary_physician||'')+'"></label></div>';
+  h+='<label class="fld"><span>Medical conditions</span><textarea id="es_cond" placeholder="Asthma, etc. \u2014 or leave blank">'+esc(h0.medical_conditions||'')+'</textarea></label>';
+  h+='<label class="fld"><span>Insurance provider</span><input type="text" id="es_ins" placeholder="e.g. Anthem / Indiana Medicaid" value="'+esc(h0.insurance_provider||'')+'"></label>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Member ID</span><input type="text" id="es_insid" value="'+esc(h0.insurance_id||'')+'"></label><label class="fld grow"><span>Medicaid ID</span><input type="text" id="es_medicaid" value="'+esc(h0.medicaid_id||'')+'"></label></div>';
+  h+='<label class="fld"><span>Anything else for an emergency</span><textarea id="es_notes" placeholder="Pharmacy, a key phone number, what helps if she\u2019s panicking\u2026">'+esc(h0.emergency_notes||'')+'</textarea></label>';
+  h+='<div id="esErr"></div><div class="sheet-actions"><button class="btn btn-ghost grow" data-action="close">Cancel</button><button class="btn btn-primary grow" data-action="save-essentials">Save</button></div>';
+  openSheet(h);
+}
+async function saveEssentials(){
+  const o={allergies:val('es_allergies'),blood_type:val('es_blood'),medical_conditions:val('es_cond'),primary_physician:val('es_doc'),insurance_provider:val('es_ins'),insurance_id:val('es_insid'),medicaid_id:val('es_medicaid'),emergency_notes:val('es_notes')};
+  try{
+    const {error}=await sb.from('households').update(o).eq('id',household.id);
+    if(error)throw error;
+    Object.assign(household,o);
+    closeSheet();renderTab();
+  }catch(e){const b=$('esErr');if(b)b.innerHTML='<div class="err">'+esc(e.message||'Could not save.')+'</div>';}
+}
+
+/* VITAL DOCUMENTS checklist */
+async function quickVitalDoc(label){
+  if(!label)return;
+  try{const {error}=await sb.from('vital_documents').insert({household_id:household.id,label,status:'need',sort_order:COL.vitalDocs.length});if(error)throw error;await loadVitalDocs();renderTab();}
+  catch(e){alert(e.message||'Could not add.');}
+}
+function vitalDocModal(d){
+  editId=d?d.id:null;
+  const statuses=[['have','Have it'],['need','Need it'],['requested','Requested']];
+  let h='<h2>'+(d?'Document':'Add a document')+'</h2><p class="glead">Track a key paper and where it physically is.</p>';
+  h+='<label class="fld"><span>Document</span><input type="text" id="vd_label" placeholder="e.g. Birth certificate" value="'+esc(d?d.label:'')+'"></label>';
+  h+='<label class="fld"><span>Status</span></label>'+picker('vd_status',statuses,d?d.status:'need');
+  h+='<label class="fld"><span>Where is it / who has it <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><input type="text" id="vd_loc" placeholder="e.g. In the file box / DCS has the original" value="'+esc(d?d.location:'')+'"></label>';
+  h+='<label class="fld"><span>Notes</span><textarea id="vd_notes" placeholder="Anything to remember\u2026">'+esc(d?d.notes:'')+'</textarea></label>';
+  h+='<div id="vdErr"></div>'+actionsRow('save-vitaldoc',d?'del-vitaldoc':null);
+  openSheet(h);bindPickers();
+}
+async function saveVitalDoc(){
+  const label=val('vd_label');if(!label){$('vdErr').innerHTML='<div class="err">Name the document.</div>';return;}
+  const o={label,status:val('vd_status')||'need',location:val('vd_loc'),notes:val('vd_notes')};
+  await saveRow('vital_documents',o,loadVitalDocs);
+}
 function taskModal(t){
   editId=t?t.id:null;
   const memOpts=[['','Anyone']].concat(COL.members.map(mb=>[mb.user_id,whoName(mb.user_id).split(' ')[0]+(mb.user_id===session.user.id?' (you)':'')]));
@@ -1933,6 +2037,13 @@ document.addEventListener('click',e=>{
     case 'save-child':saveChild();break;
     case 'edit-education':educationModal();break;
     case 'save-education':saveEducation();break;
+    case 'edit-essentials':essentialsModal();break;
+    case 'save-essentials':saveEssentials();break;
+    case 'add-vitaldoc':vitalDocModal(null);break;
+    case 'open-vitaldoc':vitalDocModal(find(COL.vitalDocs));break;
+    case 'quick-vitaldoc':quickVitalDoc(t.getAttribute('data-label'));break;
+    case 'save-vitaldoc':saveVitalDoc();break;
+    case 'del-vitaldoc':delRow('vital_documents',loadVitalDocs);break;
     case 'add-term':termModal(null);break;
     case 'open-term':termModal(find(COL.glossary));break;
     case 'save-term':saveTerm();break;
