@@ -195,6 +195,12 @@
   .codebox{font-family:ui-monospace,Menlo,monospace;font-size:22px;font-weight:600;letter-spacing:.2em;color:var(--sage-deep);background:var(--sage-soft);border-radius:12px;padding:14px;text-align:center;}
   /* packet */
   #packetView{display:none;}
+  .pk-lh{display:flex;align-items:center;gap:11px;border-bottom:2px solid var(--sage-deep);padding-bottom:12px;margin-bottom:4px;}
+  .pk-lh .pk-mark{width:34px;height:34px;border-radius:999px;background:var(--sage-deep);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .pk-lh .pk-tt{flex:1;min-width:0;}
+  .pk-lh .pk-tt h1{font-family:var(--serif);font-size:23px;font-weight:600;margin:0;line-height:1.15;}
+  .pk-lh .pk-tt .pk-sub{font-size:12px;color:var(--ink-faint);margin-top:4px;}
+  .pk-lh .pk-brand{font-family:var(--serif);font-size:13px;color:var(--sage-deep);font-weight:600;letter-spacing:.02em;text-align:right;}
   .pk-h{border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:4px;}
   .pk-sec{margin-top:22px;}
   .pk-sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--sage-deep);border-bottom:1px solid var(--line-mid);padding-bottom:6px;margin:0 0 10px;}
@@ -345,6 +351,7 @@ let UI={tab:'today',ariaFilter:'all',caseSeg:'visits',healthSeg:'providers',calM
 let draftAttach=[]; // [{tmpId,file_kind,file_name,mime,size_bytes,blob,previewUrl}]
 let apptStash=null;  // holds in-progress appointment field values when adding a provider/person inline
 let provReturn=null, personReturn=null; // when set to 'appt', saving returns to the appointment form
+let aiDraftText=''; // holds the AI-drafted (and caregiver-edited) packet narrative
 // Tier limits. Base plan: images + PDF, modest per-file cap. Premium: adds video/audio, larger cap.
 const TIER={ plan:'base',
   base:{ kinds:['image','pdf'], maxMB:10, label:'Base' },
@@ -1436,7 +1443,7 @@ function expenseReport(){
   const total=reimb.reduce((s,e)=>s+(e.amount_cents||0),0);
   const pending=reimb.filter(e=>e.status!=='reimbursed').reduce((s,e)=>s+(e.amount_cents||0),0);
   let p='<div class="pk-noprint" style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-ghost" data-action="close-packet">Close</button><button class="btn btn-primary" data-action="print-packet">'+ic('receipt',16)+'Print / Save PDF</button></div>';
-  p+='<div class="pk-h"><h1 style="font-family:var(--serif);font-size:24px;font-weight:600;margin:0">Reimbursement report \u2014 '+esc(nm)+'</h1><p class="tiny muted" style="margin:6px 0 0">Compiled '+esc(fmtLong(todayStr()))+' by '+esc(meName())+' \u00b7 '+reimb.length+' reimbursable items</p></div>';
+  p+=letterhead('Reimbursement report \u2014 '+nm,'Compiled '+fmtLong(todayStr())+' by '+meName()+'  \u00b7  '+reimb.length+' reimbursable items');
   if(!reimb.length){p+='<p class="muted" style="margin-top:22px">No reimbursable expenses logged yet.</p>';}
   else{
     p+='<div class="pk-sec"><h3>Reimbursable expenses</h3>';
@@ -1479,22 +1486,62 @@ async function delRow(table,reload){
 
 /* ---------- COURT PACKET ---------- */
 function packetModal(){
+  aiDraftText='';
   const since=new Date(Date.now()-90*86400000).toISOString().slice(0,10);
   let h='<h2>Build a court packet</h2><p class="glead">Pick the period since your last hearing. We\u2019ll compile your logs into a clean summary you can print or save as PDF.</p>';
   h+='<div class="row" style="gap:10px"><label class="fld grow"><span>From</span><input type="date" id="pk_from" value="'+since+'"></label><label class="fld grow"><span>To</span><input type="date" id="pk_to" value="'+todayStr()+'"></label></div>';
-  h+='<div class="note">'+ic('spark',16)+'<div>This compiles what you\u2019ve logged. Claude-drafted narrative and a separate caseworker/GAL version come with the AI features.</div></div>';
+  // optional AI-drafted narrative
+  h+='<div class="togglerow" style="margin-top:14px"><div style="flex:1;padding-right:12px"><span class="lab" style="display:block">Add an AI-drafted summary</span><span class="tiny faint" style="line-height:1.4;margin-top:2px;display:block">Claude drafts a factual narrative from your logs for you to review and edit. Your records for this period are sent to the AI to do this.</span></div><div class="switch" data-action="toggle" id="pk_ai"><i></i></div></div>';
+  h+='<div id="pkDraftWrap"></div>';
   h+='<div class="sheet-actions"><button class="btn btn-ghost grow" data-action="close">Cancel</button><button class="btn btn-primary grow" data-action="gen-packet">Generate</button></div>';
   openSheet(h);
 }
+// Assemble the period's records into plain text for the AI (same content the packet shows).
+function packetRecordsText(from,to){
+  const inR=d=>d&&d>=from&&d<=to;
+  const appts=COL.appts.filter(a=>inR(a.appt_date)).slice().sort((a,b)=>a.appt_date.localeCompare(b.appt_date));
+  const contacts=COL.contacts.filter(c=>inR(c.occurred_on)).slice().sort((a,b)=>a.occurred_on.localeCompare(b.occurred_on));
+  const moments=COL.moments.filter(m=>inR(m.occurred_on)).slice().sort((a,b)=>a.occurred_on.localeCompare(b.occurred_on));
+  const docs=COL.docs.filter(d=>inR(d.doc_date)).slice().sort((a,b)=>(a.doc_date||'').localeCompare(b.doc_date||''));
+  let t='';
+  if(appts.length){t+='APPOINTMENTS & HEARINGS:\n';appts.forEach(a=>{const k=APPT_KINDS[a.kind]||APPT_KINDS.other;t+='- '+fmt(a.appt_date)+(a.appt_time?' '+fmtTime(a.appt_time):'')+': '+(a.title||k.l)+(a.location?' at '+a.location:'')+(a.notes?'. Notes: '+a.notes:'')+'\n';});t+='\n';}
+  if(contacts.length){t+='VISITS & FAMILY CONTACT:\n';contacts.forEach(c=>{t+='- '+fmt(c.occurred_on)+(c.occurred_time?' '+fmtTime(c.occurred_time):'')+': '+(CONTACT_KINDS[c.kind]||'Contact')+(c.with_whom?' with '+c.with_whom:'')+(c.supervised?' (supervised)':'')+'.';if(c.what_happened)t+=' What happened: '+c.what_happened+'.';if(c.behavior_before)t+=' Behaviour before: '+c.behavior_before+'.';if(c.behavior_after)t+=' Behaviour after: '+c.behavior_after+'.';if(c.flagged)t+=' CAREGIVER FLAGGED A CONCERN'+(c.concern_note?': '+c.concern_note:'')+'.';t+='\n';});t+='\n';}
+  if(moments.length){t+='OBSERVATIONS & MILESTONES:\n';moments.forEach(m=>{const ty=TYPES[m.type]||TYPES.note;t+='- '+fmt(m.occurred_on)+': ['+ty.l+(m.mood?' / '+m.mood:'')+'] '+(m.body||'')+'\n';});t+='\n';}
+  if(docs.length){t+='DOCUMENTS ADDED:\n';docs.forEach(d=>{t+='- '+(d.doc_date?fmt(d.doc_date):'(no date)')+': '+d.name+(d.category?' ('+d.category+')':'')+(d.holder?', held by '+d.holder:'')+'\n';});t+='\n';}
+  return {text:t,count:appts.length+contacts.length+moments.length+docs.length};
+}
+async function aiDraftPacket(){
+  const from=val('pk_from'),to=val('pk_to');
+  const wrap=$('pkDraftWrap');if(!wrap)return;
+  const {text,count}=packetRecordsText(from,to);
+  if(!count){wrap.innerHTML='<div class="err" style="margin-top:10px">Nothing is logged in this period yet, so there\u2019s nothing to draft.</div>';return;}
+  wrap.innerHTML='<div class="note" style="margin-top:12px">'+ic('spark',16)+'<div>Drafting a factual summary from '+count+' logged item'+(count===1?'':'s')+'\u2026 this can take a few seconds.</div></div>';
+  try{
+    const {data,error}=await sb.functions.invoke('draft-packet',{body:{childName:childName(),period:fmtLong(from)+' \u2013 '+fmtLong(to),records:text}});
+    if(error)throw error;
+    if(data&&data.error)throw new Error(data.error);
+    const draft=(data&&data.draft)||'';
+    aiDraftText=draft;
+    wrap.innerHTML='<label class="fld" style="margin-top:12px"><span>AI draft \u2014 review &amp; edit before using</span><textarea id="pk_draft" style="min-height:200px;line-height:1.5">'+esc(draft)+'</textarea></label>'
+      +'<p class="tiny faint" style="line-height:1.5;margin-top:-4px">Read this carefully. It\u2019s a draft built only from your logs \u2014 fix anything off. It will appear at the top of your packet. Not legal advice.</p>';
+  }catch(e){
+    wrap.innerHTML='<div class="err" style="margin-top:10px">Couldn\u2019t reach the AI drafting service. '+esc((e&&e.message)||'')+'<br><span class="tiny">This feature needs the <b>draft-packet</b> Edge Function deployed (see the setup notes). You can still generate the packet without a draft.</span></div>';
+  }
+}
 function genPacket(){
   const from=val('pk_from'),to=val('pk_to');const inR=d=>d&&d>=from&&d<=to;
+  // capture any edits the caregiver made to the AI draft before generating
+  const draftEl=$('pk_draft');if(draftEl)aiDraftText=draftEl.value||'';
   const appts=COL.appts.filter(a=>inR(a.appt_date)).slice().sort((a,b)=>a.appt_date.localeCompare(b.appt_date));
   const contacts=COL.contacts.filter(c=>inR(c.occurred_on)).slice().sort((a,b)=>a.occurred_on.localeCompare(b.occurred_on));
   const moments=COL.moments.filter(m=>inR(m.occurred_on)).slice().sort((a,b)=>a.occurred_on.localeCompare(b.occurred_on));
   const docs=COL.docs.filter(d=>inR(d.doc_date)).slice().sort((a,b)=>(a.doc_date||'').localeCompare(b.doc_date||''));
   const nm=childName();
   let p='<div class="pk-noprint" style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-ghost" data-action="close-packet">Close</button><button class="btn btn-primary" data-action="print-packet">'+ic('file',16)+'Print / Save PDF</button></div>';
-  p+='<div class="pk-h"><h1 style="font-family:var(--serif);font-size:24px;font-weight:600;margin:0">Family record \u2014 '+esc(nm)+'</h1><p class="tiny muted" style="margin:6px 0 0">Period: '+esc(fmtLong(from))+' \u2013 '+esc(fmtLong(to))+' \u00b7 Compiled '+esc(fmtLong(todayStr()))+' by '+esc(meName())+'</p></div>';
+  p+=letterhead('Family record \u2014 '+nm,'Period: '+fmtLong(from)+' \u2013 '+fmtLong(to)+'  \u00b7  Compiled '+fmtLong(todayStr())+' by '+meName());
+  if(aiDraftText&&aiDraftText.trim()){
+    p+='<div class="pk-sec"><h3>Summary</h3><div class="pk-item" style="border:none;white-space:pre-wrap;line-height:1.6">'+esc(aiDraftText.trim())+'</div><p class="tiny faint" style="margin-top:6px">Narrative drafted with AI from the records below and reviewed by the family. Not legal advice.</p></div>';
+  }
   p+=pkSec('Hearings & appointments',appts.map(a=>{const k=APPT_KINDS[a.kind]||APPT_KINDS.other;return pkItem(fmt(a.appt_date)+(a.appt_time?' '+fmtTime(a.appt_time):''),(a.title||k.l)+(a.location?' \u00b7 '+esc(a.location):'')+(a.notes?'<br>'+esc(a.notes):''));}));
   p+=pkSec('Visits & biological-family contact',contacts.map(c=>{let b=(CONTACT_KINDS[c.kind]||'Contact')+(c.with_whom?' with '+esc(c.with_whom):'')+(c.supervised?' (supervised)':'');if(c.what_happened)b+='<br>'+esc(c.what_happened);if(c.behavior_before)b+='<br><span class="d">Before:</span> '+esc(c.behavior_before);if(c.behavior_after)b+='<br><span class="d">After:</span> '+esc(c.behavior_after);if(c.flagged)b+='<br><b style="color:'+C.terra+'">\u26a0 Flagged concern</b>'+(c.concern_note?': '+esc(c.concern_note):'');return pkItem(fmt(c.occurred_on)+(c.occurred_time?' '+fmtTime(c.occurred_time):''),b);}));
   p+=pkSec('Daily observations & milestones',moments.map(m=>{const t=TYPES[m.type]||TYPES.note;return pkItem(fmt(m.occurred_on),'<b>'+t.l+(m.mood?' \u00b7 '+esc(m.mood):'')+'</b> '+esc(m.body||''));}));
@@ -1509,6 +1556,11 @@ function genPacket(){
 }
 function pkSec(t,items){if(!items.length)return'';return '<div class="pk-sec"><h3>'+esc(t)+'</h3>'+items.join('')+'</div>';}
 function pkItem(date,body){return '<div class="pk-item"><span class="d">'+esc(date)+'</span><div style="margin-top:2px">'+body+'</div></div>';}
+function letterhead(title,subtitle){
+  return '<div class="pk-lh"><div class="pk-mark"><svg viewBox="0 0 24 24" width="17" height="17" fill="#F7F2E7" stroke="#F7F2E7" stroke-width="1.5">'+I.heart+'</svg></div>'
+    +'<div class="pk-tt"><h1>'+esc(title)+'</h1>'+(subtitle?'<p class="pk-sub">'+esc(subtitle)+'</p>':'')+'</div>'
+    +'<div class="pk-brand">tend</div></div>';
+}
 
 /* ---------- ATTACHMENTS ENGINE (reusable across records) ---------- */
 const KIND_ICON={image:'cam',video:'play',audio:'mic',pdf:'file',file:'file'};
@@ -1817,7 +1869,7 @@ document.addEventListener('click',e=>{
     case 'print-packet':window.print();break;
     case 'pick-photo':pickPhoto();break;
     case 'rm-photo':draftPhotoPreview=null;draftPhotoBlob=null;draftPhotoKept=null;{const s=$('photoSlot');if(s)s.innerHTML=photoSlotHTML();}break;
-    case 'toggle':t.classList.toggle('on');break;
+    case 'toggle':t.classList.toggle('on');if(t.id==='pk_ai'){if(t.classList.contains('on'))aiDraftPacket();else{aiDraftText='';const w=$('pkDraftWrap');if(w)w.innerHTML='';}}break;
     case 'pick-attach':pickAttach();break;
     case 'rm-draft-attach':removeDraftAttach(id);break;
     case 'rm-attach':removeAttach(id);break;
