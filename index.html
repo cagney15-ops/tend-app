@@ -409,7 +409,7 @@ async function route(){
 function hideNav(){ $('navbar').style.display='none'; }
 
 async function resolveHousehold(){
-  const {data,error}=await sb.from('memberships').select('role, households(id,label,child_first_name,invite_code,child_dob,placement_date,child_photo,school_name,grade,teacher_name,classes,allergies,blood_type,medical_conditions,primary_physician,insurance_provider,insurance_id,medicaid_id,emergency_notes)');
+  const {data,error}=await sb.from('memberships').select('role, households(id,label,child_first_name,invite_code,child_dob,placement_date,child_photo,school_name,grade,teacher_name,classes,allergies,blood_type,medical_conditions,primary_physician,insurance_provider,insurance_id,medicaid_id,emergency_notes,case_number,court_name,judge_name,permanency_goal,gal_name,attorney_name,next_hearing_date,next_hearing_note,case_opened_date)');
   if(error) throw error;
   if(data&&data.length&&data[0].households) return data[0].households;
   return null;
@@ -717,6 +717,7 @@ function scheduleItems(){
 }
 function attentionItems(){
   const out=[];
+  if(household&&household.next_hearing_date){const du=daysUntil(household.next_hearing_date);if(du!=null&&du>=0&&du<=14)out.push({sev:du<=3?'over':'soon',icon:'gavel',title:'Court hearing'+(household.next_hearing_note?': '+household.next_hearing_note:''),sub:(du===0?'Today':du===1?'Tomorrow':'In '+du+' days')+' \u00b7 '+fmt(household.next_hearing_date),act:'edit-case'});}
   COL.appts.forEach(a=>{const du=daysUntil(a.appt_date);const k=APPT_KINDS[a.kind]||APPT_KINDS.other;if(!a.done&&du!=null&&du<0)out.push({sev:'over',icon:k.i,title:(a.title||k.l),sub:'Overdue \u00b7 '+fmt(a.appt_date),act:'open-appt',id:a.id});});
   COL.appts.forEach(a=>{const du=daysUntil(a.appt_date);const k=APPT_KINDS[a.kind]||APPT_KINDS.other;if(!a.done&&du!=null&&du>=0&&du<=7)out.push({sev:'soon',icon:k.i,title:(a.title||k.l),sub:(du===0?'Today':du===1?'Tomorrow':'In '+du+' days')+(a.appt_time?' \u00b7 '+fmtTime(a.appt_time):''),act:'open-appt',id:a.id});});
   COL.contacts.filter(c=>c.flagged).slice(0,3).forEach(c=>out.push({sev:'flag',icon:'alertT',title:'Flagged: '+(CONTACT_KINDS[c.kind]||'contact'),sub:fmt(c.occurred_on)+(c.with_whom?' \u00b7 '+c.with_whom:''),act:'open-contact',id:c.id}));
@@ -822,6 +823,7 @@ function screenChild(){
 /* ---------- CASE ---------- */
 function screenCase(){
   let h='<p class="eyebrow">The record that speaks for you</p><h1 class="title">The case.</h1>';
+  h+=caseOverviewCard();
   h+='<div class="seg" style="margin-top:16px"><button class="'+(UI.caseSeg==='visits'?'on':'')+'" data-action="case-seg" data-s="visits">Visits & contact</button>'
     +'<button class="'+(UI.caseSeg==='appts'?'on':'')+'" data-action="case-seg" data-s="appts">Appointments</button></div>';
   h+='<div class="card" data-action="open-packet" style="margin-top:14px;cursor:pointer;background:linear-gradient(135deg,'+C.terraSoft+',rgba(244,220,208,.4));border:none">'
@@ -838,6 +840,33 @@ function screenCase(){
     if(!up.length&&!done.length){h+='<div class="empty" style="margin-top:18px"><div class="ic">'+ic('cal',22)+'</div><h3>Track every date</h3><p>Court hearings, therapy, caseworker visits, medical. Never get caught off guard.</p><button class="btn btn-soft" data-action="add-appt">Add the first one</button></div>';}
     else{if(up.length)h+='<p class="section-label">Upcoming</p>'+up.map(apptCard).join('');if(done.length)h+='<p class="section-label">Past</p>'+done.map(apptCard).join('');}
   }
+  return h;
+}
+function caseOverviewCard(){
+  const h0=household||{};
+  const has=h0.case_number||h0.court_name||h0.permanency_goal||h0.gal_name||h0.attorney_name||h0.next_hearing_date||h0.judge_name;
+  let h='<div class="card" style="margin-top:14px;padding:0;overflow:hidden">';
+  // next hearing strip — most time-sensitive, shown prominently
+  if(h0.next_hearing_date){
+    const du=daysUntil(h0.next_hearing_date);
+    const soon=du!=null&&du>=0&&du<=14;
+    h+='<div style="background:'+(soon?'rgba(200,160,85,.18)':C.sageSoft)+';padding:11px 15px;display:flex;gap:9px;align-items:flex-start"><span style="color:'+(soon?C.gold:C.sageDeep)+';display:flex;margin-top:1px">'+ic('gavel',16)+'</span><div><p class="tiny" style="font-weight:700;color:'+(soon?C.gold:C.sageDeep)+';text-transform:uppercase;letter-spacing:.06em">Next hearing</p><p style="font-size:14px;font-weight:600;margin-top:2px;line-height:1.4">'+esc(fmtLong(h0.next_hearing_date))+(du!=null&&du>=0?' \u00b7 '+(du===0?'today':du===1?'tomorrow':'in '+du+' days'):'')+(h0.next_hearing_note?' \u2014 '+esc(h0.next_hearing_note):'')+'</p></div></div>';
+  }
+  h+='<div class="row" data-action="edit-case" style="cursor:pointer;padding:13px 15px;align-items:center"><div class="ad" style="width:40px;height:40px;border-radius:11px;background:'+C.terraSoft+';color:'+C.terra+'">'+ic('gavel',18)+'</div>'
+    +'<div class="grow"><p style="font-weight:600;font-size:15px">Case overview</p><p class="tiny faint" style="margin-top:2px">'+(has?esc([h0.case_number?'#'+h0.case_number:'',h0.permanency_goal].filter(Boolean).join(' \u00b7 ')||'Tap to view or update'):'Tap to add case number, goal, hearing dates')+'</p></div><span class="faint">'+ic('edit',15)+'</span></div>';
+  if(has){
+    h+='<div style="padding:2px 15px 14px">';
+    const row=(label,val)=>val?'<div style="display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--line)"><span class="tiny faint" style="min-width:108px;flex-shrink:0">'+label+'</span><span class="tiny" style="font-weight:600;line-height:1.4">'+esc(val)+'</span></div>':'';
+    h+=row('Case number',h0.case_number);
+    h+=row('Court',h0.court_name);
+    h+=row('Judge',h0.judge_name);
+    h+=row('Permanency goal',h0.permanency_goal);
+    h+=row('GAL / CASA',h0.gal_name);
+    h+=row('Attorney',h0.attorney_name);
+    h+=row('Case opened',h0.case_opened_date?fmtLong(h0.case_opened_date):'');
+    h+='</div>';
+  }
+  h+='</div>';
   return h;
 }
 function contactCard(c){
@@ -1944,6 +1973,32 @@ async function saveVitalDoc(){
   const o={label,status:val('vd_status')||'need',location:val('vd_loc'),notes:val('vd_notes')};
   await saveRow('vital_documents',o,loadVitalDocs);
 }
+
+/* LEGAL & CASE */
+function caseModal(){
+  const h0=household||{};
+  let h='<h2>Case overview</h2><p class="glead">The case at a glance. All optional \u2014 fill in what you have. Hearings you schedule still live under Appointments; this is the case-level record.</p>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Case number</span><input type="text" id="cs_num" value="'+esc(h0.case_number||'')+'"></label><label class="fld grow"><span>Case opened</span><input type="date" id="cs_opened" value="'+(h0.case_opened_date||'')+'"></label></div>';
+  h+='<label class="fld"><span>Permanency goal</span><input type="text" id="cs_goal" placeholder="e.g. Reunification / Guardianship / Adoption" value="'+esc(h0.permanency_goal||'')+'"></label>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Court</span><input type="text" id="cs_court" placeholder="e.g. Lawrence County" value="'+esc(h0.court_name||'')+'"></label><label class="fld grow"><span>Judge</span><input type="text" id="cs_judge" value="'+esc(h0.judge_name||'')+'"></label></div>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>GAL / CASA</span><input type="text" id="cs_gal" value="'+esc(h0.gal_name||'')+'"></label><label class="fld grow"><span>Attorney</span><input type="text" id="cs_atty" value="'+esc(h0.attorney_name||'')+'"></label></div>';
+  h+='<div class="note">'+ic('spark',16)+'<div>Tip: add the GAL, attorney, or caseworker as a <b>contact</b> too \u2014 they get their own page with calls, email, and linked documents.</div></div>';
+  h+='<p class="section-label" style="margin-top:18px">Next hearing</p>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Date</span><input type="date" id="cs_hdate" value="'+(h0.next_hearing_date||'')+'"></label></div>';
+  h+='<label class="fld"><span>What it\u2019s about</span><input type="text" id="cs_hnote" placeholder="e.g. Permanency review" value="'+esc(h0.next_hearing_note||'')+'"></label>';
+  h+='<p class="tiny faint" style="line-height:1.5;margin-top:-2px">Cairn reminds you of dates you enter \u2014 it doesn\u2019t calculate legal deadlines for you. Always confirm timelines with your caseworker or attorney.</p>';
+  h+='<div id="csErr"></div><div class="sheet-actions"><button class="btn btn-ghost grow" data-action="close">Cancel</button><button class="btn btn-primary grow" data-action="save-case">Save</button></div>';
+  openSheet(h);
+}
+async function saveCase(){
+  const o={case_number:val('cs_num'),case_opened_date:val('cs_opened')||null,permanency_goal:val('cs_goal'),court_name:val('cs_court'),judge_name:val('cs_judge'),gal_name:val('cs_gal'),attorney_name:val('cs_atty'),next_hearing_date:val('cs_hdate')||null,next_hearing_note:val('cs_hnote')};
+  try{
+    const {error}=await sb.from('households').update(o).eq('id',household.id);
+    if(error)throw error;
+    Object.assign(household,o);
+    closeSheet();renderTab();
+  }catch(e){const b=$('csErr');if(b)b.innerHTML='<div class="err">'+esc(e.message||'Could not save.')+'</div>';}
+}
 function taskModal(t){
   editId=t?t.id:null;
   const memOpts=[['','Anyone']].concat(COL.members.map(mb=>[mb.user_id,whoName(mb.user_id).split(' ')[0]+(mb.user_id===session.user.id?' (you)':'')]));
@@ -2044,6 +2099,8 @@ document.addEventListener('click',e=>{
     case 'quick-vitaldoc':quickVitalDoc(t.getAttribute('data-label'));break;
     case 'save-vitaldoc':saveVitalDoc();break;
     case 'del-vitaldoc':delRow('vital_documents',loadVitalDocs);break;
+    case 'edit-case':caseModal();break;
+    case 'save-case':saveCase();break;
     case 'add-term':termModal(null);break;
     case 'open-term':termModal(find(COL.glossary));break;
     case 'save-term':saveTerm();break;
