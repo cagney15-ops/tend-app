@@ -312,12 +312,39 @@ const EXP_CATS=['Clothing','Medical','School','Food','Activities','Travel','Chil
 const EXP_STATUS={logged:{l:'Logged',c:C.inkSoft,bg:C.cream},submitted:{l:'Submitted',c:C.gold,bg:'rgba(200,160,85,.18)'},reimbursed:{l:'Reimbursed',c:C.sageDeep,bg:C.sageSoft}};
 function dollars(cents){return '$'+(Math.round(cents||0)/100).toFixed(2);}
 function parseAmount(s){s=(s||'').replace(/[^0-9.]/g,'');const v=parseFloat(s);return isNaN(v)?0:Math.round(v*100);}
+/* Built-in glossary — common, stable, national-ish terms only. Specifics vary by
+   state/county, so definitions stay general; families add their own local terms. */
+const GLOSSARY=[
+  {t:'Kinship care',a:'',c:'role',d:'When a child who can\u2019t stay with their parents is cared for by a relative or close family friend, rather than a non-relative foster home. Often preferred because it keeps the child with people they know.'},
+  {t:'Foster care',a:'',c:'role',d:'Temporary care for a child who can\u2019t live with their parents, arranged and overseen by the child-welfare system, in a licensed home or with approved caregivers.'},
+  {t:'Guardian ad Litem',a:'GAL',c:'role',d:'A person (sometimes a volunteer, sometimes an attorney) appointed by the court to represent the child\u2019s best interests during the case. They report to the judge about what they think is best for the child.'},
+  {t:'Court Appointed Special Advocate',a:'CASA',c:'role',d:'A trained community volunteer appointed by the court to get to know the child and advocate for their best interests. In some places the CASA also serves as the GAL.'},
+  {t:'Caseworker / Family Case Manager',a:'FCM',c:'role',d:'The child-welfare agency staffer assigned to the family\u2019s case. They coordinate services, visit the child, write reports for court, and are usually the main point of contact. Title varies by state (caseworker, FCM, social worker).'},
+  {t:'Child Protective Services',a:'CPS',c:'role',d:'The agency (or division) responsible for investigating reports of child abuse or neglect and arranging protection for children. Names vary by state (DCS, DCFS, DHS, etc.).'},
+  {t:'Permanency hearing',a:'',c:'process',d:'A court hearing focused on the long-term plan for the child \u2014 reunification with parents, guardianship, adoption, or another permanent arrangement. Held periodically to check progress toward that goal.'},
+  {t:'Case plan',a:'',c:'document',d:'The written plan describing what needs to happen for the child\u2019s situation to be resolved \u2014 services for the parents, the permanency goal, and each party\u2019s responsibilities. Reviewed and updated over the life of the case.'},
+  {t:'Reunification',a:'',c:'process',d:'The goal of returning a child safely to their parent(s) once the issues that led to removal have been addressed. Often the first permanency goal the court pursues.'},
+  {t:'Termination of Parental Rights',a:'TPR',c:'legal',d:'A court order permanently ending the legal parent-child relationship, freeing the child for adoption. A serious, last-resort step taken when reunification isn\u2019t possible.'},
+  {t:'Reasonable efforts',a:'',c:'legal',d:'The requirement that the agency make genuine attempts to prevent removal and, later, to reunify the family, before more permanent steps are taken. Judges review whether these efforts were made.'},
+  {t:'Placement',a:'',c:'process',d:'Where the child is living during the case (e.g. a kinship placement, a foster home). \u201cPlacement change\u201d means the child moves from one to another.'},
+  {t:'Removal',a:'',c:'process',d:'When a child is taken out of the parents\u2019 home for safety reasons and placed in care. Usually followed quickly by a court hearing to review the decision.'},
+  {t:'Indian Child Welfare Act',a:'ICWA',c:'legal',d:'A federal law giving tribes a role and setting special protections in cases involving Native American children, including placement preferences with relatives or tribal members.'},
+  {t:'Title IV-E',a:'',c:'legal',d:'The part of federal law that helps fund foster care and, in many cases, payments or support to eligible kinship caregivers. Whether a specific family qualifies depends on state rules.'},
+  {t:'Concurrent planning',a:'',c:'process',d:'Working toward reunification while at the same time preparing a backup permanency plan (like guardianship or adoption), so the child isn\u2019t left waiting if reunification fails.'},
+  {t:'Visitation',a:'',c:'process',d:'Scheduled contact between the child and their biological family. May be \u201csupervised\u201d (a third party present) or unsupervised, depending on the court\u2019s orders.'},
+  {t:'Dispositional hearing',a:'',c:'process',d:'The court hearing where the judge decides the plan after a child has been found to need the court\u2019s protection \u2014 what services are ordered and where the child will live.'},
+  {t:'Guardianship',a:'',c:'legal',d:'A legal arrangement giving a caregiver (often a relative) authority to care for and make decisions for a child, without permanently ending the parents\u2019 rights. A common permanency option in kinship cases.'},
+  {t:'Child in Need of Services',a:'CHINS',c:'legal',d:'In some states (including Indiana), the legal term/petition for a case where a court finds a child needs protection or services. Other states use terms like \u201cdependency\u201d or a numbered petition. Check your state\u2019s specific meaning.'},
+];
+function glossaryCategory(c){return {role:'Roles & people',legal:'Legal',document:'Documents',process:'Process',other:'Other'}[c]||'Other';}
 
 /* ---------- state ---------- */
 let sb=null, session=null, household=null, profiles={};
-let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[],providers:[],medications:[],expenses:[],attachments:[],tasks:[]};
-let UI={tab:'today',ariaFilter:'all',caseSeg:'visits',healthSeg:'providers',calMonth:null};
+let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[],providers:[],medications:[],expenses:[],attachments:[],tasks:[],glossary:[]};
+let UI={tab:'today',ariaFilter:'all',caseSeg:'visits',healthSeg:'providers',calMonth:null,glossQuery:''};
 let draftAttach=[]; // [{tmpId,file_kind,file_name,mime,size_bytes,blob,previewUrl}]
+let apptStash=null;  // holds in-progress appointment field values when adding a provider/person inline
+let provReturn=null, personReturn=null; // when set to 'appt', saving returns to the appointment form
 // Tier limits. Base plan: images + PDF, modest per-file cap. Premium: adds video/audio, larger cap.
 const TIER={ plan:'base',
   base:{ kinds:['image','pdf'], maxMB:10, label:'Base' },
@@ -380,7 +407,7 @@ async function resolveHousehold(){
   return null;
 }
 async function loadAll(){
-  await Promise.all([loadProfiles(),loadMembers(),loadMoments(),loadContacts(),loadAppts(),loadDocs(),loadPeople(),loadProviders(),loadMeds(),loadExpenses(),loadAttachments(),loadTasks()]);
+  await Promise.all([loadProfiles(),loadMembers(),loadMoments(),loadContacts(),loadAppts(),loadDocs(),loadPeople(),loadProviders(),loadMeds(),loadExpenses(),loadAttachments(),loadTasks(),loadGlossary()]);
   myRole=(COL.members.find(m=>m.user_id===session.user.id)||{}).role||null;
   await prepareSignedUrls();
 }
@@ -456,6 +483,10 @@ async function loadAttachments(){
 async function loadTasks(){
   const {data,error}=await sb.from('tasks').select('*').eq('household_id',household.id).order('done',{ascending:true}).order('due_date',{ascending:true,nullsFirst:false});
   if(error) throw error; COL.tasks=data||[];
+}
+async function loadGlossary(){
+  const {data,error}=await sb.from('glossary_terms').select('*').eq('household_id',household.id).order('term',{ascending:true});
+  if(error) throw error; COL.glossary=data||[];
 }
 function attachmentsFor(type,id){ return COL.attachments.filter(a=>a.record_type===type&&a.record_id===id); }
 
@@ -556,7 +587,7 @@ function renderApp(){
 function renderNav(){
   const nav=$('navbar'); nav.style.display='flex';
   const tabs=[['today','home','Today'],['child','heart',childName().split(' ')[0]||'Child'],['case','scale','Case'],['health','cross','Health'],['more','folder','More']];
-  const moreTabs=['docs','money','team','calendar'];
+  const moreTabs=['docs','money','team','calendar','glossary'];
   nav.innerHTML=tabs.map(t=>{const on=UI.tab===t[0]||(t[0]==='more'&&moreTabs.indexOf(UI.tab)>=0);return '<button class="'+(on?'on':'')+'" data-action="tab" data-tab="'+t[0]+'"><span style="display:flex">'+ic(t[1],21,on?2.2:1.7)+'</span><span>'+esc(t[2])+'</span></button>';}).join('');
 }
 function renderTab(){
@@ -566,6 +597,7 @@ function renderTab(){
   else if(UI.tab==='case')m.innerHTML=screenCase();
   else if(UI.tab==='health')m.innerHTML=screenHealth();
   else if(UI.tab==='calendar')m.innerHTML=screenCalendar();
+  else if(UI.tab==='glossary')m.innerHTML=screenGlossary();
   else if(UI.tab==='docs')m.innerHTML=screenDocs();
   else if(UI.tab==='money')m.innerHTML=screenMoney();
   else if(UI.tab==='more')m.innerHTML=screenMore();
@@ -678,6 +710,7 @@ function screenChild(){
       +'<div class="body" data-action="open-moment" data-id="'+m.id+'"><span class="pill" style="background:'+t.bg+';color:'+t.c+'">'+t.l+(m.type==='mood'&&m.mood?' \u00b7 '+esc(m.mood):'')+'</span>'
       +(m.body?'<p style="font-size:14px;line-height:1.5;margin:8px 0 0'+(m.type==='quote'?';font-family:var(--serif);font-style:italic':'')+'">'+(m.type==='quote'?'\u201c':'')+esc(m.body)+(m.type==='quote'?'\u201d':'')+'</p>':'')
       +(photoSrc(m.photo)?'<img class="photo" src="'+photoSrc(m.photo)+'" alt="">':'')
+      +attachThumbs('moment',m.id)
       +'<div class="meta"><span class="av" style="width:18px;height:18px;font-size:9px">'+initial(who)+'</span><span>'+esc(who.split(' ')[0])+' \u00b7 '+ago(m.created_at)+'</span></div></div></div>';});
   h+='</div>';return h;
 }
@@ -741,9 +774,10 @@ function screenDocs(){
   return h;
 }
 function docCard(d){
+  const nAtt=attachmentsFor('document',d.id).length;
   return '<div class="card" data-action="open-doc" data-id="'+d.id+'" style="cursor:pointer;padding:13px 14px"><div class="row">'
     +(photoSrc(d.file)?'<img src="'+photoSrc(d.file)+'" style="width:42px;height:42px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="">':'<div class="ad" style="width:42px;height:42px;border-radius:11px;background:'+C.sageSoft+';color:'+C.sageDeep+'">'+ic('file',18)+'</div>')
-    +'<div class="grow"><p style="font-weight:600;font-size:14px" class="ellip">'+esc(d.name)+'</p><p class="tiny faint" style="margin-top:3px">'+(d.doc_date?fmt(d.doc_date)+' \u00b7 ':'')+(d.holder?'held by '+esc(d.holder):'no holder noted')+'</p></div>'
+    +'<div class="grow"><p style="font-weight:600;font-size:14px" class="ellip">'+esc(d.name)+'</p><p class="tiny faint" style="margin-top:3px">'+(d.doc_date?fmt(d.doc_date)+' \u00b7 ':'')+(d.holder?'held by '+esc(d.holder):'no holder noted')+(nAtt?' \u00b7 '+ic('paperclip',11)+' '+nAtt:'')+'</p></div>'
     +'<span class="faint">'+ic('chevR',18)+'</span></div></div>';
 }
 
@@ -966,10 +1000,58 @@ function downloadICS(a){
   setTimeout(()=>{document.body.removeChild(link);URL.revokeObjectURL(url);},500);
 }
 
+/* =========================================================
+   GLOSSARY  (B36)
+========================================================= */
+function screenGlossary(){
+  let h='<p class="eyebrow">Plain-language</p><h1 class="title">Glossary.</h1>';
+  h+='<p class="lead" style="margin-top:6px">Look up a term, acronym, or form you\u2019ve heard. Definitions are general \u2014 specifics can vary by state and county.</p>';
+  h+='<input type="text" id="glossSearch" placeholder="Search e.g. CHINS, GAL, permanency\u2026" value="'+esc(UI.glossQuery)+'" style="width:100%;margin-top:14px;padding:12px 14px;border:1px solid var(--line-mid);border-radius:13px;font-family:var(--sans);font-size:15px;background:var(--bone);color:var(--ink)">';
+  h+='<button class="btn btn-soft btn-block" style="margin-top:10px" data-action="add-term">'+ic('plus',17)+'Add your own term</button>';
+  // merge built-in + custom
+  const custom=COL.glossary.map(g=>({t:g.term,a:g.acronym,c:g.category||'other',d:g.definition,id:g.id,own:true}));
+  let all=GLOSSARY.map(g=>Object.assign({},g,{own:false})).concat(custom);
+  const q=(UI.glossQuery||'').trim().toLowerCase();
+  if(q)all=all.filter(g=>(g.t+' '+(g.a||'')+' '+g.d).toLowerCase().indexOf(q)>=0);
+  all.sort((a,b)=>a.t.localeCompare(b.t));
+  if(!all.length){h+='<div class="empty" style="margin-top:18px"><div class="ic">'+ic('book',22)+'</div><h3>No match</h3><p>No term matches \u201c'+esc(UI.glossQuery)+'\u201d. If it\u2019s a local term or form, add it so it\u2019s here next time.</p><button class="btn btn-soft" data-action="add-term">Add this term</button></div>';return h;}
+  // group by category
+  const cats=['role','legal','document','process','other'];
+  const byCat={};all.forEach(g=>{(byCat[g.c]=byCat[g.c]||[]).push(g);});
+  cats.forEach(c=>{if(!byCat[c])return;
+    h+='<p class="section-label">'+glossaryCategory(c)+'</p>';
+    byCat[c].forEach(g=>{
+      h+='<div class="card" style="padding:13px 15px"'+(g.own?' data-action="open-term" data-id="'+g.id+'" style="cursor:pointer"':'')+'>'
+        +'<div class="row" style="align-items:baseline;gap:8px"><p style="font-weight:600;font-size:14.5px">'+esc(g.t)+'</p>'+(g.a?'<span class="pill" style="background:'+C.sageSoft+';color:'+C.sageDeep+'">'+esc(g.a)+'</span>':'')+(g.own?'<span class="tiny faint" style="margin-left:auto">yours</span>':'')+'</div>'
+        +'<p class="tiny" style="margin-top:6px;line-height:1.55;color:'+C.inkSoft+'">'+esc(g.d)+'</p></div>';
+    });
+  });
+  h+='<p class="tiny faint" style="margin-top:18px;line-height:1.5">These definitions are general explanations, not legal advice. Your state or county may use a term differently \u2014 check with your caseworker or attorney.</p>';
+  return h;
+}
+function termModal(g){
+  editId=g?g.id:null;
+  const cats=[['role','Roles & people'],['legal','Legal'],['document','Document'],['process','Process'],['other','Other']];
+  let h='<h2>'+(g?'Edit term':'Add a term')+'</h2><p class="glead">Add a term, acronym, or form you\u2019ve run into \u2014 especially the local ones. It\u2019ll be searchable for you and anyone in your space.</p>';
+  h+='<label class="fld"><span>Term</span><input type="text" id="g_term" placeholder="e.g. CHINS, or a form number" value="'+esc(g?g.term:'')+'"></label>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Acronym / aka <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><input type="text" id="g_acr" value="'+esc(g?g.acronym:'')+'"></label></div>';
+  h+='<label class="fld"><span>Category</span></label>'+picker('g_cat',cats,g?g.category:'other');
+  h+='<label class="fld"><span>What it means</span><textarea id="g_def" placeholder="Plain-language explanation\u2026">'+esc(g?g.definition:'')+'</textarea></label>';
+  h+='<div id="gErr"></div>'+actionsRow('save-term',g?'del-term':null);
+  openSheet(h);bindPickers();
+}
+async function saveTerm(){
+  const term=val('g_term');if(!term){$('gErr').innerHTML='<div class="err">Add the term.</div>';return;}
+  const def=val('g_def');if(!def){$('gErr').innerHTML='<div class="err">Add what it means.</div>';return;}
+  const o={term,acronym:val('g_acr'),category:val('g_cat')||'other',definition:def};
+  await saveRow('glossary_terms',o,loadGlossary);
+}
+
 function screenMore(){
   let h='<p class="eyebrow">More</p><h1 class="title">More.</h1>';
   const items=[
     ['calendar','calgrid',C.terra,C.terraSoft,'Calendar',upcomingCount()+' coming up'],
+    ['glossary','book',C.gold,'rgba(200,160,85,.18)','Glossary','look up a term or acronym'],
     ['docs','folder',C.sage,C.sageSoft,'Documents',COL.docs.length+' on file'],
     ['money','wallet',C.sageDeep,C.sageSoft,'Expenses',COL.expenses.length?dollars(COL.expenses.reduce((s,e)=>s+(e.amount_cents||0),0))+' logged':'nothing logged yet'],
     ['team','users',C.terra,C.terraSoft,'Team & settings',COL.members.length+(COL.members.length===1?' member':' members')]
@@ -1007,6 +1089,7 @@ function momentModal(m){
   h+='<label class="fld"><span id="m_textlabel">'+momentLabel(cur)+'</span><textarea id="m_body" placeholder="'+momentPh(cur)+'">'+esc(m?m.body:'')+'</textarea></label>';
   h+='<label class="fld"><span>Date</span><input type="date" id="m_date" value="'+(m?m.occurred_on:todayStr())+'"></label>';
   h+='<div id="photoSlot">'+photoSlotHTML('Add a photo')+'</div>';
+  h+=attachField('moment',m?m.id:null);
   h+='<div id="mErr"></div>'+actionsRow('save-moment',m?'del-moment':null);
   openSheet(h);bindPickers();
 }
@@ -1015,10 +1098,10 @@ function momentPh(t){return t==='quote'?'\u201cI want the bunny book again\u2026
 function reflectMomentType(t){const mw=$('moodWrap');if(mw)mw.style.display=t==='mood'?'block':'none';const l=$('m_textlabel');if(l)l.textContent=momentLabel(t);const ta=$('m_body');if(ta)ta.placeholder=momentPh(t);}
 async function saveMoment(){
   const type=val('m_type'),body=val('m_body'),occurred_on=val('m_date')||todayStr(),mood=val('m_mood');
-  if(!body&&type!=='mood'&&!draftPhotoBlob&&!draftPhotoKept){$('mErr').innerHTML='<div class="err">Add a few words or a photo first.</div>';return;}
+  if(!body&&type!=='mood'&&!draftPhotoBlob&&!draftPhotoKept&&!draftAttach.length){$('mErr').innerHTML='<div class="err">Add a few words, a photo, or an attachment first.</div>';return;}
   let photo;try{photo=await uploadDraftPhoto();}catch(e){$('mErr').innerHTML='<div class="err">Photo upload failed: '+esc(e.message||'')+'</div>';return;}
   const payload={type,body,occurred_on,mood:type==='mood'?mood:null,photo};
-  await saveRow('moments',payload,loadMoments);
+  await saveRowWithAttach('moments','moment',payload,loadMoments,'mErr');
 }
 
 /* CONTACT */
@@ -1053,31 +1136,39 @@ async function saveContact(){
 
 /* APPT */
 function apptModal(a,prefillDate){
-  editId=a?a.id:null;const cur=a?a.kind:'hearing';
+  editId=a?a.id:null;const cur=(apptStash&&apptStash.kind)||(a?a.kind:'hearing');
+  const st=apptStash; // in-progress values to restore (from inline add-provider/person)
+  const gv=(k,fb)=>st&&st[k]!=null?st[k]:fb;
   const opts=Object.keys(APPT_KINDS).map(k=>[k,APPT_KINDS[k].l]);
   let h='<h2>'+(a?'Edit appointment':'Add appointment')+'</h2><p class="glead">Hearings, therapy, caseworker visits, medical.</p>';
   h+='<label class="fld"><span>Type</span></label>'+picker('a_kind',opts,cur);
-  h+='<label class="fld"><span>Title <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><input type="text" id="a_title" placeholder="e.g. Permanency hearing" value="'+esc(a?a.title:'')+'"></label>';
-  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Date</span><input type="date" id="a_date" value="'+(a?a.appt_date:(prefillDate||todayStr()))+'"></label><label class="fld grow"><span>Time</span><input type="time" id="a_time" value="'+(a?a.appt_time||'':'')+'"></label></div>';
-  h+='<label class="fld"><span>Location</span><input type="text" id="a_loc" placeholder="Courtroom 2 / Bedford Children\u2019s\u2026" value="'+esc(a?a.location:'')+'"></label>';
-  // tag who this appointment is WITH (a provider and/or a case-team person)
+  h+='<label class="fld"><span>Title <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><input type="text" id="a_title" placeholder="e.g. Permanency hearing" value="'+esc(gv('title',a?a.title:''))+'"></label>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Date</span><input type="date" id="a_date" value="'+esc(gv('appt_date',a?a.appt_date:(prefillDate||todayStr())))+'"></label><label class="fld grow"><span>Time</span><input type="time" id="a_time" value="'+esc(gv('appt_time',a?a.appt_time||'':''))+'"></label></div>';
+  h+='<label class="fld"><span>Location</span><input type="text" id="a_loc" placeholder="Courtroom 2 / Bedford Children\u2019s\u2026" value="'+esc(gv('location',a?a.location:''))+'"></label>';
+  // tag who this appointment is WITH (a provider and/or a case-team person) — always available
   const provsA=COL.providers.slice().sort((x,y)=>x.name.localeCompare(y.name));
   const teamA=COL.people.filter(p=>p.kind==='caseteam').slice().sort((x,y)=>x.name.localeCompare(y.name));
-  if(provsA.length){
-    const prOpts=[['','\u2014 none \u2014']].concat(provsA.map(p=>[p.id,p.name+(p.specialty?' ('+p.specialty+')':'')]));
-    h+='<label class="fld"><span>With which provider <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><select id="a_provider">'+prOpts.map(o=>'<option value="'+esc(o[0])+'" '+((a&&a.provider_id===o[0])?'selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></label>';
-  } else { h+='<input type="hidden" id="a_provider" value="">'; }
-  if(teamA.length){
-    const peOpts=[['','\u2014 none \u2014']].concat(teamA.map(p=>[p.id,p.name+(p.role?' ('+p.role+')':'')]));
-    h+='<label class="fld"><span>With which case-team person <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><select id="a_caseperson">'+peOpts.map(o=>'<option value="'+esc(o[0])+'" '+((a&&a.person_id===o[0])?'selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></label>';
-  } else { h+='<input type="hidden" id="a_caseperson" value="">'; }
+  const selProv=gv('provider_id',a&&a.provider_id?a.provider_id:'');
+  const selPers=gv('person_id',a&&a.person_id?a.person_id:'');
+  const prOpts=[['','\u2014 none \u2014']].concat(provsA.map(p=>[p.id,p.name+(p.specialty?' ('+p.specialty+')':'')])).concat([['__add','\u002b Add a provider\u2026']]);
+  h+='<label class="fld"><span>With which provider <span class="faint" style="text-transform:none;letter-spacing:0">(doctor, dentist, eye, therapist)</span></span><select id="a_provider" data-action="appt-provider-sel">'+prOpts.map(o=>'<option value="'+esc(o[0])+'" '+(selProv===o[0]?'selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></label>';
+  const peOpts=[['','\u2014 none \u2014']].concat(teamA.map(p=>[p.id,p.name+(p.role?' ('+p.role+')':'')])).concat([['__add','\u002b Add a case-team person\u2026']]);
+  h+='<label class="fld"><span>With which case-team person <span class="faint" style="text-transform:none;letter-spacing:0">(caseworker, GAL, CASA)</span></span><select id="a_caseperson" data-action="appt-caseperson-sel">'+peOpts.map(o=>'<option value="'+esc(o[0])+'" '+(selPers===o[0]?'selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></label>';
   const memOpts=[['','Unassigned']].concat(COL.members.map(mb=>[mb.user_id,whoName(mb.user_id).split(' ')[0]+(mb.user_id===session.user.id?' (you)':'')]));
-  h+='<label class="fld"><span>Who\u2019s responsible <span class="faint" style="text-transform:none;letter-spacing:0">(takes her)</span></span></label>'+picker('a_assigned',memOpts,a&&a.assigned_to?a.assigned_to:'');
-  h+='<label class="fld"><span>Notes</span><textarea id="a_notes" placeholder="Bring updated visit log; GAL attending\u2026">'+esc(a?a.notes:'')+'</textarea></label>';
-  h+='<div class="togglerow"><span class="lab">Already happened</span><div class="switch '+(a&&a.done?'on':'')+'" data-action="toggle" id="a_done"><i></i></div></div>';
+  h+='<label class="fld"><span>Who\u2019s responsible <span class="faint" style="text-transform:none;letter-spacing:0">(takes her)</span></span></label>'+picker('a_assigned',memOpts,gv('assigned_to',a&&a.assigned_to?a.assigned_to:''));
+  h+='<label class="fld"><span>Notes</span><textarea id="a_notes" placeholder="Bring updated visit log; GAL attending\u2026">'+esc(gv('notes',a?a.notes:''))+'</textarea></label>';
+  h+='<div class="togglerow"><span class="lab">Already happened</span><div class="switch '+((gv('done',a&&a.done))?'on':'')+'" data-action="toggle" id="a_done"><i></i></div></div>';
   h+='<div id="aErr"></div>'+actionsRow('save-appt',a?'del-appt':null);
   openSheet(h);bindPickers();
+  apptStash=null; // consumed
 }
+// Capture current appointment form values before jumping to add a provider/person.
+function stashApptForm(extra){
+  apptStash=Object.assign({kind:val('a_kind'),title:val('a_title'),appt_date:val('a_date'),appt_time:val('a_time'),location:val('a_loc'),provider_id:val('a_provider'),person_id:val('a_caseperson'),assigned_to:val('a_assigned'),notes:val('a_notes'),done:sw('a_done')},extra||{});
+}
+// "+ Add a provider…" chosen in the appointment form
+function apptAddProvider(){ stashApptForm({provider_id:''}); providerModal(null,{returnTo:'appt'}); }
+function apptAddCasePerson(){ stashApptForm({person_id:''}); personModal(null,'caseteam',{returnTo:'appt'}); }
 async function saveAppt(){
   const o={kind:val('a_kind'),title:val('a_title'),appt_date:val('a_date')||todayStr(),appt_time:val('a_time')||null,location:val('a_loc'),notes:val('a_notes'),done:sw('a_done'),assigned_to:val('a_assigned')||null,provider_id:val('a_provider')||null,person_id:val('a_caseperson')||null};
   await saveRow('appointments',o,loadAppts);
@@ -1101,6 +1192,7 @@ function docModal(d){
     h+='<label class="fld"><span>File under <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><select id="d_link">'+linkOpts+'</select></label>';
   } else { h+='<input type="hidden" id="d_link" value="">'; }
   h+='<div id="photoSlot">'+photoSlotHTML('Photo or scan of the document')+'</div>';
+  h+=attachField('document',d?d.id:null);
   h+='<div id="dErr"></div>'+actionsRow('save-doc',d?'del-doc':null);
   openSheet(h);
 }
@@ -1111,12 +1203,12 @@ async function saveDoc(){
   const provider_id=link.indexOf('pr:')===0?link.slice(3):null;
   const person_id=link.indexOf('pe:')===0?link.slice(3):null;
   const o={name,category:val('d_cat')||'Other',doc_date:val('d_date')||null,holder:val('d_holder'),notes:val('d_notes'),file,provider_id,person_id};
-  await saveRow('documents',o,loadDocs);
+  await saveRowWithAttach('documents','document',o,loadDocs,'dErr');
 }
 
 /* PERSON */
-function personModal(p,kind){
-  editId=p?p.id:null;const k=p?p.kind:kind;
+function personModal(p,kind,opts2){
+  editId=p?p.id:null;const k=p?p.kind:kind;personReturn=(opts2&&opts2.returnTo)||null;
   const hint=k==='caseteam'?'Caseworker / GAL / CASA / therapist':'Biological mother / father / grandparent';
   let h='<h2>'+(p?'Edit person':'Add person')+'</h2>';
   h+='<label class="fld"><span>Name</span><input type="text" id="p_name" placeholder="Full name" value="'+esc(p?p.name:'')+'"></label>';
@@ -1132,6 +1224,11 @@ async function savePerson(){
   const used=COL.people.length;
   const o={name,role:val('p_role'),org:val('p_org'),phone:val('p_phone'),email:val('p_email'),kind:val('p_kind'),color:(editId?undefined:PERSON_COLORS[used%PERSON_COLORS.length])};
   if(editId)delete o.color;
+  if(personReturn==='appt'){
+    try{ o.household_id=household.id; const {data,error}=await sb.from('people').insert(o).select('id').single(); if(error)throw error;
+      personReturn=null; await loadPeople(); if(apptStash)apptStash.person_id=data.id; apptModal(null); return;
+    }catch(e){ const b=$('pErr'); if(b)b.innerHTML='<div class="err">'+esc(e.message||'Could not save.')+'</div>'; return; }
+  }
   await saveRow('people',o,loadPeople);
 }
 
@@ -1186,8 +1283,8 @@ function personDetail(p){
 }
 
 /* PROVIDER edit */
-function providerModal(p){
-  editId=p?p.id:null;const cur=p?p.kind:'doctor';
+function providerModal(p,opts2){
+  editId=p?p.id:null;const cur=p?p.kind:'doctor';provReturn=(opts2&&opts2.returnTo)||null;
   const opts=Object.keys(PROVIDER_KINDS).map(k=>[k,PROVIDER_KINDS[k].l]);
   let h='<h2>'+(p?'Edit provider':'Add a provider')+'</h2><p class="glead">A doctor, dentist, eye doctor, therapist, or pharmacy.</p>';
   h+='<label class="fld"><span>Type</span></label>'+picker('pr_kind',opts,cur);
@@ -1201,6 +1298,11 @@ function providerModal(p){
 async function saveProvider(){
   const name=val('pr_name');if(!name){$('prErr').innerHTML='<div class="err">Add a name.</div>';return;}
   const o={kind:val('pr_kind'),name,specialty:val('pr_spec'),org:val('pr_org'),phone:val('pr_phone'),address:val('pr_addr'),notes:val('pr_notes')};
+  if(provReturn==='appt'){
+    try{ o.household_id=household.id; const {data,error}=await sb.from('providers').insert(o).select('id').single(); if(error)throw error;
+      provReturn=null; await loadProviders(); if(apptStash)apptStash.provider_id=data.id; apptModal(null); return;
+    }catch(e){ const b=$('prErr'); if(b)b.innerHTML='<div class="err">'+esc(e.message||'Could not save.')+'</div>'; return; }
+  }
   await saveRow('providers',o,loadProviders);
 }
 
@@ -1628,6 +1730,10 @@ document.addEventListener('click',e=>{
     case 'toggle-task':toggleTaskDone(id);break;
     case 'edit-child':editChildModal();break;
     case 'save-child':saveChild();break;
+    case 'add-term':termModal(null);break;
+    case 'open-term':termModal(find(COL.glossary));break;
+    case 'save-term':saveTerm();break;
+    case 'del-term':delRow('glossary_terms',loadGlossary);break;
     case 'open-packet':packetModal();break;
     case 'gen-packet':genPacket();break;
     case 'close-packet':$('packetView').style.display='none';$('packetView').innerHTML='';break;
@@ -1659,6 +1765,12 @@ document.addEventListener('change',e=>{
     const w=$('c_with');
     if(p&&w&&!w.value.trim()) w.value=p.name;
   }
+  if(el&&el.id==='a_provider'&&el.value==='__add'){ apptAddProvider(); }
+  if(el&&el.id==='a_caseperson'&&el.value==='__add'){ apptAddCasePerson(); }
+});
+document.addEventListener('input',e=>{
+  const el=e.target;
+  if(el&&el.id==='glossSearch'){ UI.glossQuery=el.value; const m=$('main'); if(m){const sc=m.scrollTop; m.innerHTML=screenGlossary(); const inp=$('glossSearch'); if(inp){inp.focus(); try{inp.setSelectionRange(el.value.length,el.value.length);}catch(_){}} m.scrollTop=sc;} }
 });
 
 boot();
