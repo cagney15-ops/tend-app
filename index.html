@@ -224,6 +224,7 @@
 
 <script>
 "use strict";
+const BUILD_STAMP="2026-06 education+ai";
 
 /* ============================================================
    CONFIG  ->  paste your anon key between the quotes below.
@@ -774,6 +775,7 @@ function screenToday(){
   else{h+='<div>'+feed.map(f=>{const who=whoName(f.by);return '<div class="row" style="padding:11px 0;border-bottom:1px solid var(--line);align-items:flex-start">'
     +'<span class="av">'+initial(who)+'</span><div class="grow"><div class="row" style="gap:7px"><span style="font-size:13px;font-weight:600">'+esc(who.split(' ')[0])+'</span><span class="tiny faint">'+ago(f.at)+'</span></div>'
     +'<p class="tiny muted" style="margin-top:2px;line-height:1.45">'+esc(f.text)+'</p></div><span class="faint" style="margin-top:2px">'+ic(f.icon,15)+'</span></div>';}).join('')+'</div>';}
+  h+='<p class="tiny faint" style="text-align:center;margin-top:24px;opacity:.5">build edu-2 \u00b7 '+esc(BUILD_STAMP)+'</p>';
   return h;
 }
 function quick(act,icon,col,bg,label){return '<div class="quick" data-action="'+act+'"><div class="ic" style="background:'+bg+';color:'+col+'">'+ic(icon,18)+'</div><span>'+label+'</span></div>';}
@@ -1146,18 +1148,46 @@ async function saveTerm(){
 }
 
 function screenMore(){
-  let h='<p class="eyebrow">More</p><h1 class="title">More.</h1>';
-  const items=[
-    ['calendar','calgrid',C.terra,C.terraSoft,'Calendar',upcomingCount()+' coming up'],
-    ['glossary','book',C.gold,'rgba(200,160,85,.18)','Glossary','look up a term or acronym'],
-    ['docs','folder',C.sage,C.sageSoft,'Documents',COL.docs.length+' on file'],
-    ['money','wallet',C.sageDeep,C.sageSoft,'Expenses',COL.expenses.length?dollars(COL.expenses.reduce((s,e)=>s+(e.amount_cents||0),0))+' logged':'nothing logged yet'],
-    ['team','users',C.terra,C.terraSoft,'Team & settings',COL.members.length+(COL.members.length===1?' member':' members')]
+  let h='<p class="eyebrow">Everything in one place</p><h1 class="title">Menu.</h1>';
+  const expTotal=COL.expenses.reduce((s,e)=>s+(e.amount_cents||0),0);
+  const pending=COL.expenses.filter(e=>e.reimbursable&&e.status!=='reimbursed').reduce((s,e)=>s+(e.amount_cents||0),0);
+  const groups=[
+    ['Care',[
+      ['health','cross',C.terra,C.terraSoft,'Health & providers',(COL.providers.length||0)+' provider'+(COL.providers.length===1?'':'s')+' \u00b7 '+(COL.medications.length||0)+' medication'+(COL.medications.length===1?'':'s')],
+    ]],
+    ['Case',[
+      ['calendar','calgrid',C.gold,'rgba(200,160,85,.18)','Calendar',upcomingCount()+' coming up'],
+      ['docs','folder',C.sage,C.sageSoft,'Documents',(COL.docs.length||0)+' on file'],
+      ['__open-packet','receipt',C.sageDeep,C.sageSoft,'Build a court packet','compile your records into a PDF'],
+    ]],
+    ['Money',[
+      ['money','wallet',C.sageDeep,C.sageSoft,'Expenses',COL.expenses.length?dollars(expTotal)+' logged'+(pending?' \u00b7 '+dollars(pending)+' awaiting':''):'nothing logged yet'],
+    ]],
+    ['People',[
+      ['team','users',C.terra,C.terraSoft,'Team & contacts',(COL.members.length||0)+(COL.members.length===1?' member':' members')+' \u00b7 '+(COL.people.length||0)+' contact'+(COL.people.length===1?'':'s')],
+    ]],
+    ['Reference',[
+      ['glossary','book',C.gold,'rgba(200,160,85,.18)','Glossary','look up a term or acronym'],
+    ]],
+    ['Settings',[
+      ['__goto-team','mail',C.sage,C.sageSoft,'Invite someone','share your space\u2019s join code'],
+      ['__signout','out',C.terra,C.terraSoft,'Sign out',meName()],
+    ]],
   ];
-  h+='<div style="margin-top:16px">'+items.map(it=>'<div class="card" data-action="tab" data-tab="'+it[0]+'" style="cursor:pointer;margin-bottom:10px"><div class="row">'
-    +'<div class="ad" style="width:42px;height:42px;border-radius:12px;background:'+it[3]+';color:'+it[2]+'">'+ic(it[1],19)+'</div>'
-    +'<div class="grow"><p style="font-weight:600;font-size:15px">'+it[4]+'</p><p class="tiny faint" style="margin-top:2px">'+esc(it[5])+'</p></div>'
-    +'<span class="faint">'+ic('chevR',18)+'</span></div></div>').join('')+'</div>';
+  h+='<div style="margin-top:14px">';
+  groups.forEach(g=>{
+    h+='<p class="section-label">'+esc(g[0])+'</p>';
+    g[1].forEach(it=>{
+      const act=it[0].startsWith('__')?it[0].slice(2):'tab';
+      const attr=it[0].startsWith('__')?'data-action="'+it[0].slice(2)+'"':'data-action="tab" data-tab="'+it[0]+'"';
+      h+='<div class="card" '+attr+' style="cursor:pointer;margin-bottom:10px"><div class="row">'
+        +'<div class="ad" style="width:42px;height:42px;border-radius:12px;background:'+it[3]+';color:'+it[2]+'">'+ic(it[1],19)+'</div>'
+        +'<div class="grow"><p style="font-weight:600;font-size:15px">'+esc(it[4])+'</p><p class="tiny faint" style="margin-top:2px">'+esc(it[5])+'</p></div>'
+        +'<span class="faint">'+ic('chevR',18)+'</span></div></div>';
+    });
+  });
+  h+='</div>';
+  h+='<p class="tiny faint" style="text-align:center;margin-top:18px;opacity:.5">build edu-2 \u00b7 '+esc(BUILD_STAMP)+'</p>';
   return h;
 }
 
