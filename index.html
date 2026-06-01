@@ -573,8 +573,10 @@ function ageFrom(ds){const d=parseD(ds);if(!d)return '';const now=new Date();let
 function meName(){return profiles[session.user.id]||(session.user.email||'You').split('@')[0];}
 function whoName(uid){return profiles[uid]||'Someone';}
 
+function isFamily(){return myRole==='family';}
 function renderApp(){
   $('cfgBanner').innerHTML='';
+  if(isFamily()){return renderFamilyApp();}
   root.innerHTML=
     '<header class="top"><div class="mark" style="width:28px;height:28px;border-radius:999px;background:var(--sage);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="13" height="13" fill="#F7F2E7" stroke="#F7F2E7" stroke-width="1.5">'+I.heart+'</svg></div>'
     +'<span class="name">tend</span><div class="spacer"></div>'
@@ -590,6 +592,72 @@ function renderNav(){
   const moreTabs=['docs','money','team','calendar','glossary'];
   nav.innerHTML=tabs.map(t=>{const on=UI.tab===t[0]||(t[0]==='more'&&moreTabs.indexOf(UI.tab)>=0);return '<button class="'+(on?'on':'')+'" data-action="tab" data-tab="'+t[0]+'"><span style="display:flex">'+ic(t[1],21,on?2.2:1.7)+'</span><span>'+esc(t[2])+'</span></button>';}).join('');
 }
+
+/* =========================================================
+   FAMILY (read-only) experience — only shared items.
+   The RLS in upgrade-12 is the real wall; this is the UI side.
+========================================================= */
+function renderFamilyApp(){
+  if(!['fam-updates','fam-calendar'].includes(UI.tab))UI.tab='fam-updates';
+  root.innerHTML=
+    '<header class="top"><div class="mark" style="width:28px;height:28px;border-radius:999px;background:var(--sage);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="13" height="13" fill="#F7F2E7" stroke="#F7F2E7" stroke-width="1.5">'+I.heart+'</svg></div>'
+    +'<span class="name">tend</span><div class="spacer"></div>'
+    +'<button class="chip" data-action="refresh" title="Refresh">'+ic('refresh',15)+'</button>'
+    +'<button class="chip" data-action="fam-signout"><span class="av">'+initial(meName())+'</span>'+esc(meName().split(' ')[0])+'</button>'
+    +'</header><main id="main"></main>';
+  const nav=$('navbar'); nav.style.display='flex';
+  const tabs=[['fam-updates','heart','Updates'],['fam-calendar','calgrid','Calendar']];
+  nav.innerHTML=tabs.map(t=>{const on=UI.tab===t[0];return '<button class="'+(on?'on':'')+'" data-action="tab" data-tab="'+t[0]+'"><span style="display:flex">'+ic(t[1],21,on?2.2:1.7)+'</span><span>'+esc(t[2])+'</span></button>';}).join('');
+  renderFamilyTab();
+}
+function renderFamilyTab(){
+  const m=$('main'); if(!m)return;
+  m.innerHTML = UI.tab==='fam-calendar' ? screenFamilyCalendar() : screenFamilyUpdates();
+  m.scrollTop=0;
+}
+function familyHeaderHTML(){
+  const nm=childName();
+  let h='<div class="hub" style="cursor:default">';
+  h+=(photoSrc(household.child_photo)?'<img class="hub-photo" src="'+photoSrc(household.child_photo)+'" alt="">':'<div class="hub-photo hub-ph">'+ic('heart',26)+'</div>');
+  h+='<div class="hub-info"><h1 class="title" style="margin:0">'+esc(nm)+'</h1><p class="tiny faint" style="margin-top:4px">Shared updates from '+esc(nm)+'\u2019s caregivers</p></div></div>';
+  return h;
+}
+function screenFamilyUpdates(){
+  let h='<p class="eyebrow">Family</p>';
+  h+=familyHeaderHTML();
+  // Only shared moments. (RLS already filters; we filter again client-side as belt-and-suspenders.)
+  const shared=COL.moments.filter(m=>m.shared_with_family).slice().sort((a,b)=>(b.occurred_on||'').localeCompare(a.occurred_on||''));
+  h+='<p class="section-label">Updates</p>';
+  if(!shared.length){h+='<div class="empty"><div class="ic">'+ic('heart',22)+'</div><h3>Nothing shared yet</h3><p>When '+esc(childName())+'\u2019s caregivers share a photo or update, it\u2019ll appear here.</p></div>';return h;}
+  h+='<div style="margin-top:8px">';let lastDay='';
+  shared.forEach(m=>{if(m.occurred_on!==lastDay){lastDay=m.occurred_on;h+='<div class="tl-day">'+esc(fmtLong(m.occurred_on)||'')+'</div>';}
+    const t=TYPES[m.type]||TYPES.note;
+    h+='<div class="entry"><div class="stem"></div><div class="dot" style="background:'+t.bg+';color:'+t.c+'">'+ic(t.i,18)+'</div>'
+      +'<div class="body"><span class="pill" style="background:'+t.bg+';color:'+t.c+'">'+t.l+(m.type==='mood'&&m.mood?' \u00b7 '+esc(m.mood):'')+'</span>'
+      +(m.body?'<p style="font-size:14px;line-height:1.5;margin:8px 0 0'+(m.type==='quote'?';font-family:var(--serif);font-style:italic':'')+'">'+(m.type==='quote'?'\u201c':'')+esc(m.body)+(m.type==='quote'?'\u201d':'')+'</p>':'')
+      +(photoSrc(m.photo)?'<img class="photo" src="'+photoSrc(m.photo)+'" alt="">':'')
+      +attachThumbs('moment',m.id)
+      +'</div></div>';});
+  h+='</div>';
+  h+='<p class="tiny faint" style="margin-top:18px;line-height:1.5">You\u2019re seeing only what '+esc(childName())+'\u2019s caregivers have chosen to share.</p>';
+  return h;
+}
+function screenFamilyCalendar(){
+  let h='<p class="eyebrow">Family</p><h1 class="title">Calendar.</h1>';
+  h+='<p class="lead" style="margin-top:6px">Shared dates from '+esc(childName())+'\u2019s caregivers.</p>';
+  const shared=COL.appts.filter(a=>a.shared_with_family).slice().sort((a,b)=>(a.appt_date||'').localeCompare(b.appt_date||'')||((a.appt_time||'')+'').localeCompare((b.appt_time||'')+''));
+  const today=todayStr();
+  const upcoming=shared.filter(a=>(a.appt_date||'')>=today);
+  const past=shared.filter(a=>(a.appt_date||'')<today).reverse();
+  if(!shared.length){h+='<div class="empty" style="margin-top:18px"><div class="ic">'+ic('calgrid',22)+'</div><h3>Nothing shared yet</h3><p>Shared events will show up here.</p></div>';return h;}
+  const famApptCard=a=>{const k=APPT_KINDS[a.kind]||APPT_KINDS.other;
+    return '<div class="card" style="padding:13px 14px"><div class="row"><div class="ad" style="width:40px;height:40px;border-radius:12px;background:'+k.c+'1f;color:'+k.c+'">'+ic(k.i,18)+'</div>'
+      +'<div class="grow"><p style="font-weight:600;font-size:14.5px">'+esc(a.title||k.l)+'</p><p class="tiny faint" style="margin-top:3px">'+esc(fmtLong(a.appt_date))+(a.appt_time?' \u00b7 '+fmtTime(a.appt_time):'')+(a.location?' \u00b7 '+esc(a.location):'')+'</p></div></div></div>';};
+  if(upcoming.length){h+='<p class="section-label">Coming up</p>'+upcoming.map(famApptCard).join('');}
+  if(past.length){h+='<p class="section-label">Past</p>'+past.map(famApptCard).join('');}
+  return h;
+}
+
 function renderTab(){
   const m=$('main'); if(!m) return;
   if(UI.tab==='today')m.innerHTML=screenToday();
@@ -711,7 +779,7 @@ function screenChild(){
       +(m.body?'<p style="font-size:14px;line-height:1.5;margin:8px 0 0'+(m.type==='quote'?';font-family:var(--serif);font-style:italic':'')+'">'+(m.type==='quote'?'\u201c':'')+esc(m.body)+(m.type==='quote'?'\u201d':'')+'</p>':'')
       +(photoSrc(m.photo)?'<img class="photo" src="'+photoSrc(m.photo)+'" alt="">':'')
       +attachThumbs('moment',m.id)
-      +'<div class="meta"><span class="av" style="width:18px;height:18px;font-size:9px">'+initial(who)+'</span><span>'+esc(who.split(' ')[0])+' \u00b7 '+ago(m.created_at)+'</span></div></div></div>';});
+      +'<div class="meta"><span class="av" style="width:18px;height:18px;font-size:9px">'+initial(who)+'</span><span>'+esc(who.split(' ')[0])+' \u00b7 '+ago(m.created_at)+'</span>'+(m.shared_with_family?'<span class="pill" style="background:'+C.sageSoft+';color:'+C.sageDeep+';margin-left:auto">'+ic('users',10)+' shared</span>':'')+'</div></div></div>';});
   h+='</div>';return h;
 }
 
@@ -757,7 +825,7 @@ function apptCard(a){
     +'<p class="tiny muted" style="margin-top:3px">'+esc(fmtLong(a.appt_date))+(a.appt_time?' \u00b7 '+fmtTime(a.appt_time):'')+(a.location?' \u00b7 '+esc(a.location):'')+'</p>'
     +(who?'<p class="tiny" style="margin-top:5px;color:'+C.sageDeep+';font-weight:600"><span class="av sm" style="width:16px;height:16px;font-size:9px;display:inline-flex;vertical-align:middle;margin-right:5px;background:'+C.sage+'">'+initial(who)+'</span>'+esc(who)+'</p>':'')
     +'</div>'
-    +(!a.done&&du!=null&&du>=0&&du<=3?'<span class="pill" style="background:'+C.terraSoft+';color:'+C.terra+'">soon</span>':'')+'</div>'
+    +(!a.done&&du!=null&&du>=0&&du<=3?'<span class="pill" style="background:'+C.terraSoft+';color:'+C.terra+'">soon</span>':'')+(a.shared_with_family?'<span class="pill" style="background:'+C.sageSoft+';color:'+C.sageDeep+'">'+ic('users',10)+' shared</span>':'')+'</div>'
     +'<div class="row" style="margin-top:10px;gap:8px;justify-content:flex-end"><button class="btn btn-ghost btn-sm" data-action="ics-appt" data-id="'+a.id+'">'+ic('dl',15)+'Add to calendar</button></div>'
     +'</div>';
 }
@@ -812,7 +880,7 @@ function screenTeam(){
   h+='<p class="tiny faint" style="text-align:center;margin-top:18px;line-height:1.5">tend \u00b7 kinship</p>';
   return h;
 }
-function roleLabel(r){return {caregiver:'Caregiver',co_caregiver:'Co-caregiver',caseworker:'Caseworker',gal:'GAL',casa:'CASA',therapist:'Therapist',viewer:'Viewer'}[r]||r;}
+function roleLabel(r){return {caregiver:'Caregiver',co_caregiver:'Co-caregiver',family:'Family',caseworker:'Caseworker',gal:'GAL',casa:'CASA',therapist:'Therapist',viewer:'Viewer'}[r]||r;}
 function teamGroup(title,kind,hint){
   const list=COL.people.filter(p=>p.kind===kind);
   let h='<p class="section-label">'+esc(title)+'</p>';
@@ -1075,6 +1143,12 @@ function openSheet(inner){
 function closeSheet(){const s=$('scrim');modalOpen=false;draftPhotoPreview=null;draftPhotoBlob=null;draftPhotoKept=null;draftAttach=[];editId=null;if(!s)return;s.classList.remove('show');setTimeout(()=>{$('modalRoot').innerHTML='';},200);}
 function val(id){const e=$(id);return e?e.value.trim():'';}
 function sw(id){const e=$(id);return e?e.classList.contains('on'):false;}
+function shareToggle(id,on){
+  return '<div class="togglerow" style="background:'+C.sageSoft+';border-color:transparent">'
+    +'<div style="flex:1;padding-right:12px"><span class="lab" style="display:block">Share with family</span>'
+    +'<span class="tiny faint" style="line-height:1.4;margin-top:2px;display:block">Family members in this space can see this. Off keeps it private to caregivers.</span></div>'
+    +'<div class="switch '+(on?'on':'')+'" data-action="toggle" id="'+id+'"><i></i></div></div>';
+}
 function actionsRow(saveAct,delAct){return '<div class="sheet-actions">'+(delAct?'<button class="btn btn-ghost" style="color:'+C.terra+';flex:0 0 auto" data-action="'+delAct+'">'+ic('trash',16)+'</button>':'')+'<button class="btn btn-ghost grow" data-action="close">Cancel</button><button class="btn btn-primary grow" data-action="'+saveAct+'">Save</button></div>';}
 function picker(name,opts,cur,onchange){return '<input type="hidden" id="'+name+'" value="'+esc(cur||opts[0][0])+'"><div class="pickrow" data-picker="'+name+'"'+(onchange?' data-onchange="'+onchange+'"':'')+'>'+opts.map(o=>'<button type="button" class="pick '+((cur||opts[0][0])===o[0]?'on':'')+'" data-val="'+esc(o[0])+'">'+esc(o[1])+'</button>').join('')+'</div>';}
 function bindPickers(){document.querySelectorAll('[data-picker]').forEach(row=>{row.addEventListener('click',e=>{const b=e.target.closest('.pick');if(!b)return;row.querySelectorAll('.pick').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(row.getAttribute('data-picker')).value=b.getAttribute('data-val');const oc=row.getAttribute('data-onchange');if(oc==='moment-type')reflectMomentType(b.getAttribute('data-val'));});});}
@@ -1090,6 +1164,7 @@ function momentModal(m){
   h+='<label class="fld"><span>Date</span><input type="date" id="m_date" value="'+(m?m.occurred_on:todayStr())+'"></label>';
   h+='<div id="photoSlot">'+photoSlotHTML('Add a photo')+'</div>';
   h+=attachField('moment',m?m.id:null);
+  h+=shareToggle('m_share',m&&m.shared_with_family);
   h+='<div id="mErr"></div>'+actionsRow('save-moment',m?'del-moment':null);
   openSheet(h);bindPickers();
 }
@@ -1100,7 +1175,7 @@ async function saveMoment(){
   const type=val('m_type'),body=val('m_body'),occurred_on=val('m_date')||todayStr(),mood=val('m_mood');
   if(!body&&type!=='mood'&&!draftPhotoBlob&&!draftPhotoKept&&!draftAttach.length){$('mErr').innerHTML='<div class="err">Add a few words, a photo, or an attachment first.</div>';return;}
   let photo;try{photo=await uploadDraftPhoto();}catch(e){$('mErr').innerHTML='<div class="err">Photo upload failed: '+esc(e.message||'')+'</div>';return;}
-  const payload={type,body,occurred_on,mood:type==='mood'?mood:null,photo};
+  const payload={type,body,occurred_on,mood:type==='mood'?mood:null,photo,shared_with_family:sw('m_share')};
   await saveRowWithAttach('moments','moment',payload,loadMoments,'mErr');
 }
 
@@ -1158,19 +1233,20 @@ function apptModal(a,prefillDate){
   h+='<label class="fld"><span>Who\u2019s responsible <span class="faint" style="text-transform:none;letter-spacing:0">(takes her)</span></span></label>'+picker('a_assigned',memOpts,gv('assigned_to',a&&a.assigned_to?a.assigned_to:''));
   h+='<label class="fld"><span>Notes</span><textarea id="a_notes" placeholder="Bring updated visit log; GAL attending\u2026">'+esc(gv('notes',a?a.notes:''))+'</textarea></label>';
   h+='<div class="togglerow"><span class="lab">Already happened</span><div class="switch '+((gv('done',a&&a.done))?'on':'')+'" data-action="toggle" id="a_done"><i></i></div></div>';
+  h+=shareToggle('a_share',gv('shared_with_family',a&&a.shared_with_family));
   h+='<div id="aErr"></div>'+actionsRow('save-appt',a?'del-appt':null);
   openSheet(h);bindPickers();
   apptStash=null; // consumed
 }
 // Capture current appointment form values before jumping to add a provider/person.
 function stashApptForm(extra){
-  apptStash=Object.assign({kind:val('a_kind'),title:val('a_title'),appt_date:val('a_date'),appt_time:val('a_time'),location:val('a_loc'),provider_id:val('a_provider'),person_id:val('a_caseperson'),assigned_to:val('a_assigned'),notes:val('a_notes'),done:sw('a_done')},extra||{});
+  apptStash=Object.assign({kind:val('a_kind'),title:val('a_title'),appt_date:val('a_date'),appt_time:val('a_time'),location:val('a_loc'),provider_id:val('a_provider'),person_id:val('a_caseperson'),assigned_to:val('a_assigned'),notes:val('a_notes'),done:sw('a_done'),shared_with_family:sw('a_share')},extra||{});
 }
 // "+ Add a provider…" chosen in the appointment form
 function apptAddProvider(){ stashApptForm({provider_id:''}); providerModal(null,{returnTo:'appt'}); }
 function apptAddCasePerson(){ stashApptForm({person_id:''}); personModal(null,'caseteam',{returnTo:'appt'}); }
 async function saveAppt(){
-  const o={kind:val('a_kind'),title:val('a_title'),appt_date:val('a_date')||todayStr(),appt_time:val('a_time')||null,location:val('a_loc'),notes:val('a_notes'),done:sw('a_done'),assigned_to:val('a_assigned')||null,provider_id:val('a_provider')||null,person_id:val('a_caseperson')||null};
+  const o={kind:val('a_kind'),title:val('a_title'),appt_date:val('a_date')||todayStr(),appt_time:val('a_time')||null,location:val('a_loc'),notes:val('a_notes'),done:sw('a_done'),assigned_to:val('a_assigned')||null,provider_id:val('a_provider')||null,person_id:val('a_caseperson')||null,shared_with_family:sw('a_share')};
   await saveRow('appointments',o,loadAppts);
 }
 
@@ -1534,8 +1610,8 @@ async function regenCode(){if(!confirm('Generate a new invite code? The old one 
 function manageMemberModal(targetId){
   const mb=COL.members.find(m=>m.user_id===targetId);if(!mb)return;
   editId=null;const nm=whoName(targetId);
-  const roles=[['caregiver','Caregiver'],['co_caregiver','Co-caregiver'],['viewer','Viewer']];
-  let h='<h2>'+esc(nm)+'</h2><p class="glead">Set this person\u2019s role, or remove them from the space. Caregivers have full admin control.</p>';
+  const roles=[['caregiver','Caregiver'],['co_caregiver','Co-caregiver'],['family','Family (view shared only)'],['viewer','Viewer']];
+  let h='<h2>'+esc(nm)+'</h2><p class="glead">Set this person\u2019s role, or remove them from the space. Caregivers have full access. <b>Family</b> members see only the moments and calendar events you\u2019ve shared \u2014 never the case, health, documents, or money.</p>';
   h+='<label class="fld"><span>Role</span></label>'+picker('mm_role',roles,mb.role);
   h+='<input type="hidden" id="mm_uid" value="'+esc(targetId)+'"><div id="mmErr"></div>';
   h+='<div class="sheet-actions"><button class="btn btn-ghost" style="color:'+C.terra+';flex:0 0 auto" data-action="remove-member">'+ic('trash',16)+'</button><button class="btn btn-ghost grow" data-action="close">Cancel</button><button class="btn btn-primary grow" data-action="save-member-role">Save role</button></div>';
@@ -1676,7 +1752,8 @@ document.addEventListener('click',e=>{
   const a=t.getAttribute('data-action');const id=t.getAttribute('data-id');
   const find=(arr)=>arr.find(x=>x.id===id);
   switch(a){
-    case 'tab':UI.tab=t.getAttribute('data-tab');closeSheet();renderTab();break;
+    case 'tab':UI.tab=t.getAttribute('data-tab');closeSheet();if(isFamily())renderFamilyTab();else renderTab();break;
+    case 'fam-signout':signOut();break;
     case 'goto-team':UI.tab='team';renderTab();break;
     case 'refresh':softRefresh();break;
     case 'open-add':addChooser();break;
