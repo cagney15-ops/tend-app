@@ -312,7 +312,7 @@ const CONTACT_KINDS={visit:'Supervised visit',call:'Phone call',text:'Text / mes
 const APPT_KINDS={hearing:{l:'Court hearing',i:'gavel',c:C.terra},therapy:{l:'Therapy',i:'heart',c:C.sage},medical:{l:'Medical',i:'pulse',c:C.terra},caseworker:{l:'Caseworker visit',i:'shield',c:C.sage},visit:{l:'Family visit',i:'users',c:C.gold},school:{l:'School',i:'school',c:C.gold},other:{l:'Other',i:'cal',c:C.inkSoft}};
 const DOC_CATS=['Placement / custody order','Court order','Case plan','Visitation order','IEP / 504 plan','Immunization records','Birth certificate','Social Security card','Insurance / Medicaid','Medical record','Therapy notes','School records','Background / home study','Financial / benefits','Photo of document','Other'];
 const COMMON_DOCS=['Placement / custody order','Case plan','Immunization records','Birth certificate','Insurance / Medicaid'];
-const PROVIDER_KINDS={doctor:{l:'Doctor',i:'cross'},dentist:{l:'Dentist',i:'tooth'},optometrist:{l:'Eye doctor',i:'glasses'},therapist:{l:'Therapist',i:'heart'},pharmacy:{l:'Pharmacy',i:'pill'},specialist:{l:'Specialist',i:'cross'},other:{l:'Other',i:'cross'}};
+const PROVIDER_KINDS={doctor:{l:'Doctor',i:'cross'},dentist:{l:'Dentist',i:'tooth'},optometrist:{l:'Eye doctor',i:'glasses'},therapist:{l:'Therapist',i:'heart'},pharmacy:{l:'Pharmacy',i:'pill'},school:{l:'School',i:'book'},specialist:{l:'Specialist',i:'cross'},other:{l:'Other',i:'cross'}};
 const MED_KINDS={medication:{l:'Medication',i:'pill'},eyeglasses:{l:'Eyeglasses',i:'glasses'},device:{l:'Device',i:'pulse'},other:{l:'Other',i:'pill'}};
 const EXP_CATS=['Clothing','Medical','School','Food','Activities','Travel','Childcare','Other'];
 const EXP_STATUS={logged:{l:'Logged',c:C.inkSoft,bg:C.cream},submitted:{l:'Submitted',c:C.gold,bg:'rgba(200,160,85,.18)'},reimbursed:{l:'Reimbursed',c:C.sageDeep,bg:C.sageSoft}};
@@ -408,7 +408,7 @@ async function route(){
 function hideNav(){ $('navbar').style.display='none'; }
 
 async function resolveHousehold(){
-  const {data,error}=await sb.from('memberships').select('role, households(id,label,child_first_name,invite_code,child_dob,placement_date,child_photo)');
+  const {data,error}=await sb.from('memberships').select('role, households(id,label,child_first_name,invite_code,child_dob,placement_date,child_photo,school_name,grade,teacher_name,classes)');
   if(error) throw error;
   if(data&&data.length&&data[0].households) return data[0].households;
   return null;
@@ -569,6 +569,27 @@ async function joinHousehold(){
 
 /* ---------- app shell ---------- */
 function childName(){return (household&&household.child_first_name)||'your child';}
+function educationCard(){
+  const h0=household||{};
+  const has=h0.school_name||h0.grade||h0.teacher_name||h0.classes;
+  const schools=COL.providers.filter(p=>p.kind==='school');
+  let h='<div class="card" style="margin-top:14px;padding:0;overflow:hidden">';
+  h+='<div class="row" data-action="edit-education" style="cursor:pointer;padding:13px 15px;align-items:center"><div class="ad" style="width:38px;height:38px;border-radius:11px;background:rgba(200,160,85,.18);color:'+C.gold+'">'+ic('book',18)+'</div>'
+    +'<div class="grow"><p style="font-weight:600;font-size:14px">School</p>'
+    +(has?'<p class="tiny faint" style="margin-top:2px">'+esc([h0.school_name,h0.grade].filter(Boolean).join(' \u00b7 ')||'Tap to add details')+'</p>':'<p class="tiny faint" style="margin-top:2px">Tap to add her school, grade & teacher</p>')
+    +'</div><span class="faint">'+ic('edit',15)+'</span></div>';
+  if(has){
+    h+='<div style="padding:0 15px 13px">';
+    if(h0.teacher_name)h+='<p class="tiny" style="margin-top:4px"><span class="faint">Teacher</span> \u00b7 '+esc(h0.teacher_name)+'</p>';
+    if(h0.classes)h+='<p class="tiny" style="margin-top:6px"><span class="faint">Classes</span> \u00b7 '+esc(h0.classes)+'</p>';
+    h+='</div>';
+  }
+  if(schools.length){
+    h+='<div style="border-top:1px solid var(--line);padding:6px 8px">'+schools.map(p=>'<div class="row" data-action="open-provider" data-id="'+p.id+'" style="cursor:pointer;padding:7px 8px"><span class="faint" style="display:flex">'+ic('book',15)+'</span><div class="grow"><p class="tiny" style="font-weight:600">'+esc(p.name)+'</p>'+(p.phone?'<p class="tiny faint">'+esc(p.phone)+'</p>':'')+'</div><span class="faint">'+ic('chevR',15)+'</span></div>').join('')+'</div>';
+  }
+  h+='</div>';
+  return h;
+}
 function childStats(){
   const out=[];
   if(household&&household.placement_date){const d=daysSince(household.placement_date);if(d!=null){out.push({v:d===0?'Today':d+(d===1?' day':' days'),l:'in your care'});out.push({v:fmt(household.placement_date),l:'placed'});}}
@@ -773,6 +794,8 @@ function screenChild(){
   h+='<div class="fab-row" style="margin-top:14px">'
     +quick('add-moment','book',C.sage,C.sageSoft,'Log a moment')
     +quick('add-appt','cal',C.gold,'rgba(200,160,85,.18)','Add an event')+'</div>';
+  // education snapshot
+  h+=educationCard();
   const filters=[['all','All'],['note','Notes'],['mood','Mood'],['milestone','Milestones'],['quote','Quotes'],['memory','Photos'],['health','Health']];
   h+='<div class="chips" style="margin-top:16px">'+filters.map(f=>'<button class="fchip '+(UI.ariaFilter===f[0]?'on':'')+'" data-action="aria-filter" data-f="'+f[0]+'">'+f[1]+'</button>').join('')+'</div>';
   let list=COL.moments.slice();
@@ -1767,7 +1790,26 @@ async function saveChild(){
   }catch(e){const b=$('chErr');if(b)b.innerHTML='<div class="err">'+esc(e.message||'Could not save.')+'</div>';}
 }
 
-/* TASKS */
+/* EDUCATION snapshot */
+function educationModal(){
+  const h0=household||{};
+  let h='<h2>School &amp; education</h2><p class="glead">A quick snapshot for '+esc(childName())+'\u2019s page. For the school\u2019s full contact info, add it as a provider; for a teacher or aide, add them as a contact \u2014 then they get their own detail page, calls, and linked documents.</p>';
+  h+='<label class="fld"><span>School</span><input type="text" id="ed_school" placeholder="e.g. Bedford Elementary" value="'+esc(h0.school_name||'')+'"></label>';
+  h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Grade</span><input type="text" id="ed_grade" placeholder="e.g. 2nd grade" value="'+esc(h0.grade||'')+'"></label><label class="fld grow"><span>Main teacher</span><input type="text" id="ed_teacher" placeholder="e.g. Ms. Alvarez" value="'+esc(h0.teacher_name||'')+'"></label></div>';
+  h+='<label class="fld"><span>Classes / subjects <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><textarea id="ed_classes" placeholder="Reading, Math, Art, Speech\u2026">'+esc(h0.classes||'')+'</textarea></label>';
+  h+='<div class="note">'+ic('spark',16)+'<div>Report cards, IEPs, and enrollment forms go in <b>Documents</b> \u2014 file them under \u201cIEP / 504 plan\u201d or \u201cSchool records.\u201d IEP meetings and conferences can be added as appointments.</div></div>';
+  h+='<div id="edErr"></div><div class="sheet-actions"><button class="btn btn-ghost grow" data-action="close">Cancel</button><button class="btn btn-primary grow" data-action="save-education">Save</button></div>';
+  openSheet(h);
+}
+async function saveEducation(){
+  const o={school_name:val('ed_school'),grade:val('ed_grade'),teacher_name:val('ed_teacher'),classes:val('ed_classes')};
+  try{
+    const {error}=await sb.from('households').update(o).eq('id',household.id);
+    if(error)throw error;
+    Object.assign(household,o);
+    closeSheet();renderApp();
+  }catch(e){const b=$('edErr');if(b)b.innerHTML='<div class="err">'+esc(e.message||'Could not save.')+'</div>';}
+}
 function taskModal(t){
   editId=t?t.id:null;
   const memOpts=[['','Anyone']].concat(COL.members.map(mb=>[mb.user_id,whoName(mb.user_id).split(' ')[0]+(mb.user_id===session.user.id?' (you)':'')]));
@@ -1859,6 +1901,8 @@ document.addEventListener('click',e=>{
     case 'toggle-task':toggleTaskDone(id);break;
     case 'edit-child':editChildModal();break;
     case 'save-child':saveChild();break;
+    case 'edit-education':educationModal();break;
+    case 'save-education':saveEducation();break;
     case 'add-term':termModal(null);break;
     case 'open-term':termModal(find(COL.glossary));break;
     case 'save-term':saveTerm();break;
