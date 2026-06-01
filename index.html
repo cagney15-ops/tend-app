@@ -231,7 +231,7 @@ const BUILD_STAMP="2026-06 education+ai";
    Project URL is already filled in.
    ============================================================ */
 const SUPABASE_URL  = "https://mkwthdcpafpmxwpdgbov.supabase.co";
-const SUPABASE_ANON = "sb_publishable_O4tCND6tdSJcppYZWBZ4NA_7nn7fhHI";
+const SUPABASE_ANON = "sb_publishable_O4tCND6tdSJcppYZWBZ4NA_7nn7fhHIE";
 // For reminder notifications (optional — added during the push-notifications setup).
 // Leave as-is until you generate VAPID keys; the app works fine without it.
 const VAPID_PUBLIC  = "PASTE_YOUR_VAPID_PUBLIC_KEY_HERE";
@@ -347,7 +347,7 @@ function glossaryCategory(c){return {role:'Roles & people',legal:'Legal',documen
 
 /* ---------- state ---------- */
 let sb=null, session=null, household=null, profiles={};
-let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[],providers:[],medications:[],expenses:[],attachments:[],tasks:[],glossary:[],vitalDocs:[]};
+let COL={moments:[],contacts:[],appts:[],docs:[],people:[],members:[],providers:[],medications:[],expenses:[],attachments:[],tasks:[],glossary:[],vitalDocs:[],aboutChild:[]};
 let UI={tab:'today',ariaFilter:'all',caseSeg:'visits',healthSeg:'providers',calMonth:null,glossQuery:''};
 let draftAttach=[]; // [{tmpId,file_kind,file_name,mime,size_bytes,blob,previewUrl}]
 let apptStash=null;  // holds in-progress appointment field values when adding a provider/person inline
@@ -415,7 +415,7 @@ async function resolveHousehold(){
   return null;
 }
 async function loadAll(){
-  await Promise.all([loadProfiles(),loadMembers(),loadMoments(),loadContacts(),loadAppts(),loadDocs(),loadPeople(),loadProviders(),loadMeds(),loadExpenses(),loadAttachments(),loadTasks(),loadGlossary(),loadVitalDocs()]);
+  await Promise.all([loadProfiles(),loadMembers(),loadMoments(),loadContacts(),loadAppts(),loadDocs(),loadPeople(),loadProviders(),loadMeds(),loadExpenses(),loadAttachments(),loadTasks(),loadGlossary(),loadVitalDocs(),loadAboutChild()]);
   myRole=(COL.members.find(m=>m.user_id===session.user.id)||{}).role||null;
   await prepareSignedUrls();
 }
@@ -500,6 +500,10 @@ async function loadVitalDocs(){
   const {data,error}=await sb.from('vital_documents').select('*').eq('household_id',household.id).order('sort_order',{ascending:true}).order('created_at',{ascending:true});
   if(error) throw error; COL.vitalDocs=data||[];
 }
+async function loadAboutChild(){
+  const {data,error}=await sb.from('about_child').select('*').eq('household_id',household.id).order('sort_order',{ascending:true}).order('created_at',{ascending:true});
+  if(error) throw error; COL.aboutChild=data||[];
+}
 function attachmentsFor(type,id){ return COL.attachments.filter(a=>a.record_type===type&&a.record_id===id); }
 
 /* ---------- login / onboard (unchanged scaffold) ---------- */
@@ -574,6 +578,38 @@ async function joinHousehold(){
 
 /* ---------- app shell ---------- */
 function childName(){return (household&&household.child_first_name)||'your child';}
+const ABOUT_CATS={
+  person:{l:'Her people',one:'A person',i:'users',c:'#7E9C8B',ph:'e.g. Mia \u2014 best friend since pre-K'},
+  like:{l:'Likes',one:'Something she likes',i:'star',c:'#C8A055',ph:'e.g. Dinosaurs, the color purple, mac & cheese'},
+  dislike:{l:'Dislikes',one:'Something she dislikes',i:'x',c:'#B5836B',ph:'e.g. Won\u2019t eat anything green'},
+  comfort:{l:'What comforts her',one:'A comfort',i:'heart',c:'#7E9C8B',ph:'e.g. Her blue blanket; being read to at night'},
+  fear:{l:'What scares her',one:'A fear',i:'shield',c:'#B5836B',ph:'e.g. Thunderstorms; the dark'},
+  routine:{l:'Routine',one:'A routine',i:'clock',c:'#C8A055',ph:'e.g. Needs a snack right after school; bath before bed'},
+  background:{l:'Background',one:'Background',i:'home',c:'#7E9C8B',ph:'e.g. Baptized Catholic; grandma speaks Spanish at home'},
+  other:{l:'Other',one:'Something else',i:'star',c:'#9A8C7A',ph:'Anything worth remembering about who she is'}
+};
+function aboutChildSection(){
+  const nm=childName();
+  let h='<div class="row" style="align-items:baseline;margin-top:22px"><p class="section-label" style="margin:0">About '+esc(nm)+'</p><button class="btn btn-ghost btn-sm" style="margin-left:auto" data-action="add-about">'+ic('plus',14)+'Add</button></div>';
+  if(!COL.aboutChild.length){
+    h+='<div class="card" style="padding:14px"><p class="tiny" style="line-height:1.5;color:'+C.inkSoft+'">The things you just know about '+esc(nm)+' \u2014 her people, what she loves, what comforts her, what scares her. Small things that help anyone caring for her, and that matter most if she ever moves. Add them one at a time.</p>'
+      +'<div class="row" style="flex-wrap:wrap;gap:7px;margin-top:11px">'+['person','like','comfort','fear','routine','background'].map(k=>'<button class="chip-add" data-action="add-about" data-cat="'+k+'">'+ic(ABOUT_CATS[k].i,12)+ABOUT_CATS[k].l+'</button>').join('')+'</div></div>';
+    return h;
+  }
+  // group by category, in a sensible order
+  const order=['person','like','dislike','comfort','fear','routine','background','other'];
+  const byCat={};COL.aboutChild.forEach(a=>{(byCat[a.category]=byCat[a.category]||[]).push(a);});
+  h+='<div style="margin-top:4px">';
+  order.forEach(k=>{if(!byCat[k])return;const cat=ABOUT_CATS[k]||ABOUT_CATS.other;
+    h+='<div class="card" style="padding:12px 14px;margin-bottom:8px"><div class="row" style="gap:9px;align-items:center;margin-bottom:4px"><span style="color:'+cat.c+';display:flex">'+ic(cat.i,15)+'</span><span class="tiny" style="font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:'+cat.c+'">'+cat.l+'</span></div>';
+    byCat[k].forEach(a=>{
+      h+='<div class="row" data-action="open-about" data-id="'+a.id+'" style="cursor:pointer;align-items:flex-start;padding:6px 0"><div class="grow"><p style="font-size:14px;font-weight:600">'+esc(a.title)+'</p>'+(a.detail?'<p class="tiny faint" style="margin-top:2px;line-height:1.45">'+esc(a.detail)+'</p>':'')+'</div><span class="faint" style="margin-top:2px">'+ic('chevR',15)+'</span></div>';
+    });
+    h+='</div>';
+  });
+  h+='</div>';
+  return h;
+}
 function educationCard(){
   const h0=household||{};
   const has=h0.school_name||h0.grade||h0.teacher_name||h0.classes;
@@ -803,6 +839,8 @@ function screenChild(){
     +quick('add-appt','cal',C.gold,'rgba(200,160,85,.18)','Add an event')+'</div>';
   // education snapshot
   h+=educationCard();
+  // about her — identity & history
+  h+=aboutChildSection();
   const filters=[['all','All'],['note','Notes'],['mood','Mood'],['milestone','Milestones'],['quote','Quotes'],['memory','Photos'],['health','Health']];
   h+='<div class="chips" style="margin-top:16px">'+filters.map(f=>'<button class="fchip '+(UI.ariaFilter===f[0]?'on':'')+'" data-action="aria-filter" data-f="'+f[0]+'">'+f[1]+'</button>').join('')+'</div>';
   let list=COL.moments.slice();
@@ -1999,6 +2037,25 @@ async function saveCase(){
     closeSheet();renderTab();
   }catch(e){const b=$('csErr');if(b)b.innerHTML='<div class="err">'+esc(e.message||'Could not save.')+'</div>';}
 }
+
+/* ABOUT HER — identity & history */
+function aboutModal(a,presetCat){
+  editId=a?a.id:null;
+  const cat=a?a.category:(presetCat||'person');
+  const cats=Object.keys(ABOUT_CATS).map(k=>[k,ABOUT_CATS[k].l]);
+  const meta=ABOUT_CATS[cat]||ABOUT_CATS.other;
+  let h='<h2>'+(a?'Edit':'Add')+' \u2014 about '+esc(childName())+'</h2><p class="glead">One small thing about who she is. Pick what kind, then a few words.</p>';
+  h+='<label class="fld"><span>Kind</span></label>'+picker('ab_cat',cats,cat);
+  h+='<label class="fld"><span>What is it</span><input type="text" id="ab_title" placeholder="'+esc(meta.ph)+'" value="'+esc(a?a.title:'')+'"></label>';
+  h+='<label class="fld"><span>More detail <span class="faint" style="text-transform:none;letter-spacing:0">(optional)</span></span><textarea id="ab_detail" placeholder="Anything that helps someone understand it\u2026">'+esc(a?a.detail:'')+'</textarea></label>';
+  h+='<div id="abErr"></div>'+actionsRow('save-about',a?'del-about':null);
+  openSheet(h);bindPickers();
+}
+async function saveAbout(){
+  const title=val('ab_title');if(!title){$('abErr').innerHTML='<div class="err">Add a few words first.</div>';return;}
+  const o={category:val('ab_cat')||'other',title,detail:val('ab_detail')};
+  await saveRow('about_child',o,loadAboutChild);
+}
 function taskModal(t){
   editId=t?t.id:null;
   const memOpts=[['','Anyone']].concat(COL.members.map(mb=>[mb.user_id,whoName(mb.user_id).split(' ')[0]+(mb.user_id===session.user.id?' (you)':'')]));
@@ -2101,6 +2158,10 @@ document.addEventListener('click',e=>{
     case 'del-vitaldoc':delRow('vital_documents',loadVitalDocs);break;
     case 'edit-case':caseModal();break;
     case 'save-case':saveCase();break;
+    case 'add-about':aboutModal(null,t.getAttribute('data-cat'));break;
+    case 'open-about':aboutModal(find(COL.aboutChild));break;
+    case 'save-about':saveAbout();break;
+    case 'del-about':delRow('about_child',loadAboutChild);break;
     case 'add-term':termModal(null);break;
     case 'open-term':termModal(find(COL.glossary));break;
     case 'save-term':saveTerm();break;
