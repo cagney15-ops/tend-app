@@ -3,10 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#6B7F5A" />
-<title>Tend</title>
+<meta name="theme-color" content="#EDE6D6" />
+<title>Cairn Family</title>
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='11' fill='%236B7F5A'/%3E%3Cpath d='M24 38s-12-7.5-15.5-15A7.5 7.5 0 0 1 24 12a7.5 7.5 0 0 1 15.5 11C36 30.5 24 38 24 38Z' fill='%23F7F2E7'/%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="cairn-apple-180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Cairn" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
@@ -224,7 +228,7 @@
 
 <script>
 "use strict";
-const BUILD_STAMP="2026-06 education+ai";
+const BUILD_STAMP="2026-06 cairn+push LIVE";
 
 /* ============================================================
    CONFIG  ->  paste your anon key between the quotes below.
@@ -371,9 +375,9 @@ function boot(){
   if(!SUPABASE_URL || !SUPABASE_ANON || SUPABASE_ANON==='PASTE_YOUR_ANON_KEY_HERE'){
     $('cfgBanner').innerHTML='';
     root.innerHTML='<div class="center">'
-      +'<div class="brand"><div class="mark"><svg viewBox="0 0 24 24" width="16" height="16" fill="#F7F2E7" stroke="#F7F2E7" stroke-width="1.5"><path d="M12 21s-7-4.5-9.5-9A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9Z"/></svg></div><span class="name">tend</span></div>'
+      +brandRow()
       +'<div class="card" style="margin-top:18px"><h1 style="font-size:20px;margin:0 0 8px">One step left</h1>'
-      +'<p class="lead" style="font-size:14px;margin:0 0 12px">This copy of Tend doesn\u2019t have its Supabase key yet. Open <b>index.html</b> in a text editor, find the line near the top that reads:</p>'
+      +'<p class="lead" style="font-size:14px;margin:0 0 12px">This copy of Cairn doesn\u2019t have its Supabase key yet. Open <b>index.html</b> in a text editor, find the line near the top that reads:</p>'
       +'<div style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--cream-deep);border-radius:10px;padding:11px 13px;color:var(--ink);word-break:break-all">const SUPABASE_ANON = "PASTE_YOUR_ANON_KEY_HERE";</div>'
       +'<p class="lead" style="font-size:14px;margin:12px 0 0">Replace the placeholder with your anon key (keep the quotes), save, and re-deploy. Your Project URL is already set.</p>'
       +'</div></div>';
@@ -507,7 +511,8 @@ async function loadAboutChild(){
 function attachmentsFor(type,id){ return COL.attachments.filter(a=>a.record_type===type&&a.record_id===id); }
 
 /* ---------- login / onboard (unchanged scaffold) ---------- */
-function brandRow(){return '<div class="brand"><div class="mark"><svg viewBox="0 0 24 24" width="16" height="16" fill="#F7F2E7" stroke="#F7F2E7" stroke-width="1.5">'+I.heart+'</svg></div><span class="name">tend</span><span class="tag">Kinship</span></div>';}
+function cairnMark(h){h=h||40;var w=Math.round(h*48/58*100)/100;return '<svg viewBox="0 0 48 58" width="'+w+'" height="'+h+'" aria-hidden="true" style="display:block;flex:none"><g transform="translate(10.2,-4.9) scale(1.15)"><path d="M12 21s-7-4.5-9.5-9A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9Z" fill="#BD6A48"/></g><rect x="13.5" y="24" width="21" height="8" rx="4" fill="#A8B49E"/><rect x="9.5" y="35" width="29" height="9" rx="4.5" fill="#7C8A70"/><rect x="6" y="47" width="36" height="9" rx="4.5" fill="#2C2924"/></svg>';}
+function brandRow(){return '<div style="display:flex;flex-direction:column;align-items:center;gap:9px;margin-bottom:6px"><span style="display:flex">'+cairnMark(52)+'</span><span style="display:flex;flex-direction:column;align-items:center;gap:5px"><span style="font-family:var(--serif);font-size:30px;font-weight:500;letter-spacing:-.02em">Cairn Family</span><span class="tag">Kinship</span></span></div>';}
 let loginMode='password';
 function renderLogin(){
   $('cfgBanner').innerHTML='';
@@ -647,8 +652,7 @@ function renderApp(){
   $('cfgBanner').innerHTML='';
   if(isFamily()){return renderFamilyApp();}
   root.innerHTML=
-    '<header class="top"><div class="mark" style="width:28px;height:28px;border-radius:999px;background:var(--sage);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="13" height="13" fill="#F7F2E7" stroke="#F7F2E7" stroke-width="1.5">'+I.heart+'</svg></div>'
-    +'<span class="name">tend</span><div class="spacer"></div>'
+    '<header class="top">'+cairnMark(26)+'<div style="display:flex;flex-direction:column;gap:0;line-height:1.06;margin-left:2px"><span class="name" style="font-size:18px">Cairn Family</span><span style="font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--sage-deep);font-weight:700">Kinship</span></div><div class="spacer"></div>'
     +'<button class="chip" data-action="refresh" title="Refresh">'+ic('refresh',15)+'</button>'
     +'<button class="chip chip-add" data-action="open-add" title="Add">'+ic('plus',16)+'Add</button>'
     +'<button class="chip" data-action="goto-team"><span class="av">'+initial(meName())+'</span>'+esc(meName().split(' ')[0])+'</button>'
@@ -669,8 +673,7 @@ function renderNav(){
 function renderFamilyApp(){
   if(!['fam-updates','fam-calendar'].includes(UI.tab))UI.tab='fam-updates';
   root.innerHTML=
-    '<header class="top"><div class="mark" style="width:28px;height:28px;border-radius:999px;background:var(--sage);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="13" height="13" fill="#F7F2E7" stroke="#F7F2E7" stroke-width="1.5">'+I.heart+'</svg></div>'
-    +'<span class="name">tend</span><div class="spacer"></div>'
+    '<header class="top">'+cairnMark(26)+'<div style="display:flex;flex-direction:column;gap:0;line-height:1.06;margin-left:2px"><span class="name" style="font-size:18px">Cairn Family</span><span style="font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--sage-deep);font-weight:700">Kinship</span></div><div class="spacer"></div>'
     +'<button class="chip" data-action="refresh" title="Refresh">'+ic('refresh',15)+'</button>'
     +'<button class="chip" data-action="fam-signout"><span class="av">'+initial(meName())+'</span>'+esc(meName().split(' ')[0])+'</button>'
     +'</header><main id="main"></main>';
@@ -780,6 +783,7 @@ function screenToday(){
   const hr=new Date().getHours();const greet=hr<12?'Good morning':hr<18?'Good afternoon':'Good evening';
   let h='<p class="eyebrow">'+esc(fmtLong(todayStr()))+'</p>';
   h+='<h1 class="title">'+greet+', <b>'+esc(meName().split(' ')[0])+'</b>.</h1>';
+  h+=installNudgeHTML();
   const wk=weekCounts();
   h+='<div class="card" style="margin-top:16px;background:linear-gradient(135deg,'+C.sageSoft+',rgba(212,220,201,.3));border:none">'
     +'<p class="eyebrow" style="color:'+C.sageDeep+'">This week</p><div class="stat" style="margin-top:10px">'
@@ -1001,6 +1005,81 @@ function teamGroup(title,kind,hint){
 /* =========================================================
    UNIFIED ADD CHOOSER
 ========================================================= */
+/* =========================================================
+   SCAN A DOCUMENT  (AI intake — photo -> fields, photo kept)
+========================================================= */
+const SCAN_TYPES=[
+  ['document','file','Document','court order, letter, records, school form'],
+  ['appointment','cal','Appointment notice','a hearing notice or appointment card'],
+  ['medication','pill','Prescription / med label','a medication label or Rx'],
+  ['provider','cross','Provider card','a doctor/clinic/business card'],
+  ['case','gavel','Court / case paper','reads case number, court, hearing date'],
+];
+let scanType='document';
+function scanChooser(){
+  let h='<h2>Scan a document</h2><p class="glead">Take a photo and we\u2019ll read the details and fill in a form for you to check. The photo is saved with the record too. Nothing is shared anywhere.</p>';
+  h+='<p class="section-label">What are you scanning?</p><div class="chooser">';
+  h+=SCAN_TYPES.map(o=>'<button class="choice" data-action="scan-pick" data-type="'+o[0]+'"><span class="ci" style="background:'+C.sageSoft+';color:'+C.sageDeep+'">'+ic(o[1],20)+'</span><span class="ct"><b>'+o[2]+'</b><small>'+o[3]+'</small></span></button>').join('');
+  h+='</div>';
+  h+='<p class="tiny faint" style="line-height:1.5;margin-top:14px">We read only what\u2019s visibly on the page \u2014 we don\u2019t guess. You review and edit everything before it\u2019s saved.</p>';
+  openSheet(h);
+}
+function scanPick(type){
+  scanType=type||'document';
+  // reuse the photo input; on file chosen, run the scan
+  const inp=$('photoInput');if(!inp){alert('Photo input unavailable.');return;}
+  inp.onchange=()=>{const f=inp.files&&inp.files[0];if(!f)return;
+    compressImage(f,(dataUrl,blob)=>{ runScan(dataUrl,blob); });
+  };
+  inp.click();
+}
+async function runScan(dataUrl,blob){
+  // carry the captured photo as the record's draft photo (evidence) up front
+  draftPhotoPreview=dataUrl;draftPhotoBlob=blob;draftPhotoKept=null;
+  // show a working sheet
+  const tlabel=(SCAN_TYPES.find(t=>t[0]===scanType)||[])[2]||'document';
+  let h='<h2>Reading your '+esc(tlabel.toLowerCase())+'\u2026</h2><div class="note" style="margin-top:6px">'+ic('spark',16)+'<div>Pulling out the details. This takes a few seconds.</div></div>';
+  h+='<div class="photo-prev" style="margin-top:12px"><img src="'+dataUrl+'" alt=""></div>';
+  openSheet(h);
+  try{
+    const b64=dataUrl.split(',')[1];
+    const {data,error}=await sb.functions.invoke('scan-document',{body:{recordType:scanType,imageBase64:b64,mediaType:'image/jpeg'}});
+    if(error)throw error;
+    if(data&&data.error)throw new Error(data.error);
+    const draft=(data&&data.draft)||{};
+    routeScanDraft(scanType,draft);
+  }catch(e){
+    let h2='<h2>Couldn\u2019t read it automatically</h2><p class="glead">'+esc((e&&e.message)||'The scan didn\u2019t work.')+'</p>';
+    h2+='<p class="tiny faint" style="line-height:1.5">You can still add it by hand \u2014 the photo you took is kept and ready to attach.</p>';
+    h2+='<div class="sheet-actions"><button class="btn btn-ghost grow" data-action="close">Cancel</button><button class="btn btn-primary grow" data-action="scan-manual">Add it by hand</button></div>';
+    openSheet(h2);
+  }
+}
+// open the matching create-modal, pre-filled with the AI draft, photo already carried in draftPhoto*
+function routeScanDraft(type,draft){
+  scanCarryPhoto=true; // preserve the captured photo through the modal's setDraftFromExisting
+  if(type==='document'){
+    docModal({name:draft.name||'',category:draft.category||'',doc_date:draft.doc_date||'',holder:draft.holder||''});
+  } else if(type==='appointment'){
+    apptModal({title:draft.title||'',kind:draft.kind||'other',appt_date:draft.appt_date||'',appt_time:draft.appt_time||'',location:draft.location||''});
+  } else if(type==='medication'){
+    medModal({name:draft.name||'',dose:draft.dose||'',schedule:draft.schedule||'',refill_date:draft.refill_date||'',active:true,_scanPrescriber:draft.prescriber_name||''});
+  } else if(type==='provider'){
+    providerModal({kind:draft.kind||'doctor',name:draft.name||'',specialty:draft.specialty||'',org:draft.org||'',phone:draft.phone||'',address:draft.address||''});
+  } else if(type==='case'){
+    // case fields live on household; prefill the case modal (user still must Save)
+    scanCarryPhoto=false; scanCaseDraft=draft; caseModal(true);
+  } else {
+    docModal({name:draft.name||''});
+  }
+}
+let scanCaseDraft=null;
+let scanCarryPhoto=false;
+function tial(s){return (s||'').toLowerCase();}
+function scanManual(){ // fallback: open a plain document form with the kept photo
+  docModal({});
+}
+
 function addChooser(){
   const opts=[
     ['add-moment','book',C.sage,C.sageSoft,'Moment','a note, mood, milestone, quote or photo'],
@@ -1013,7 +1092,10 @@ function addChooser(){
     ['add-doc','file',C.sage,C.sageSoft,'Document','placement order, records, scans'],
     ['add-person','users',C.gold,'rgba(200,160,85,.18)','Person','case team or biological family']
   ];
-  let h='<h2>Add to '+esc(childName())+'\u2019s record</h2><p class="glead">What would you like to capture?</p><div class="chooser">';
+  let h='<h2>Add to '+esc(childName())+'\u2019s record</h2><p class="glead">What would you like to capture?</p>';
+  // scan path — photo-first, AI fills the fields
+  h+='<button class="choice" data-action="scan-doc" style="border:1px solid '+C.sage+';background:'+C.sageSoft+';margin-bottom:12px"><span class="ci" style="background:'+C.sage+';color:'+C.bone+'">'+ic('cam',20)+'</span><span class="ct"><b>Scan a document</b><small>snap a photo \u2014 we read it and fill in the details for you</small></span></button>';
+  h+='<div class="chooser">';
   h+=opts.map(o=>'<button class="choice" data-action="'+o[0]+'"><span class="ci" style="background:'+o[3]+';color:'+o[2]+'">'+ic(o[1],20)+'</span><span class="ct"><b>'+o[4]+'</b><small>'+o[5]+'</small></span></button>').join('');
   h+='</div>';
   openSheet(h);
@@ -1210,7 +1292,7 @@ function downloadICS(a){
   if(!start.allday){const p=a.appt_date.split('-');const t=(a.appt_time||'00:00').split(':');const d=new Date(+p[0],+p[1]-1,+p[2],+t[0],+t[1]);d.setHours(d.getHours()+1);end=d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+'T'+pad2(d.getHours())+pad2(d.getMinutes())+'00';}
   const uidv=(a.id||uid())+'@tend';
   const esc2=s=>(s||'').replace(/([,;\\])/g,'\\$1').replace(/\n/g,'\\n');
-  let body='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Tend//Kinship//EN\r\nBEGIN:VEVENT\r\nUID:'+uidv+'\r\nDTSTAMP:'+icsStamp(ymdLocal(new Date()),pad2(new Date().getHours())+':'+pad2(new Date().getMinutes())).dt+'\r\n';
+  let body='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Cairn Family//Kinship//EN\r\nBEGIN:VEVENT\r\nUID:'+uidv+'\r\nDTSTAMP:'+icsStamp(ymdLocal(new Date()),pad2(new Date().getHours())+':'+pad2(new Date().getMinutes())).dt+'\r\n';
   if(start.allday){body+='DTSTART;VALUE=DATE:'+start.dt+'\r\n';}
   else{body+='DTSTART:'+start.dt+'\r\nDTEND:'+end+'\r\n';}
   body+='SUMMARY:'+esc2(a.title||k.l)+'\r\n';
@@ -1737,7 +1819,7 @@ function pkItem(date,body){return '<div class="pk-item"><span class="d">'+esc(da
 function letterhead(title,subtitle){
   return '<div class="pk-lh"><div class="pk-mark"><svg viewBox="0 0 24 24" width="17" height="17" fill="#F7F2E7" stroke="#F7F2E7" stroke-width="1.5">'+I.heart+'</svg></div>'
     +'<div class="pk-tt"><h1>'+esc(title)+'</h1>'+(subtitle?'<p class="pk-sub">'+esc(subtitle)+'</p>':'')+'</div>'
-    +'<div class="pk-brand">tend</div></div>';
+    +'<div class="pk-brand">Cairn</div></div>';
 }
 
 /* ---------- ATTACHMENTS ENGINE (reusable across records) ---------- */
@@ -1829,7 +1911,11 @@ function photoSlotHTML(label){
   if(draftPhotoPreview)return '<div class="photo-prev"><img src="'+draftPhotoPreview+'" alt=""><button class="icon-btn rm" data-action="rm-photo">'+ic('x',16)+'</button></div>';
   return '<div class="photo-add" data-action="pick-photo">'+ic('cam',18)+esc(label||'Add a photo')+'<input type="file" id="photoInput" accept="image/*" style="display:none"></div>';
 }
-function setDraftFromExisting(v){draftPhotoKept=v||null;draftPhotoBlob=null;draftPhotoPreview=v?photoSrc(v):null;}
+function setDraftFromExisting(v){
+  // If a scan just captured a photo to carry into this form, keep it (don't clobber).
+  if(scanCarryPhoto){scanCarryPhoto=false;return;}
+  draftPhotoKept=v||null;draftPhotoBlob=null;draftPhotoPreview=v?photoSrc(v):null;
+}
 function pickPhoto(){const inp=$('photoInput');if(!inp)return;inp.onchange=()=>{const f=inp.files&&inp.files[0];if(!f)return;compressImage(f,(dataUrl,blob)=>{draftPhotoPreview=dataUrl;draftPhotoBlob=blob;draftPhotoKept=null;const s=$('photoSlot');if(s)s.innerHTML=photoSlotHTML();});};inp.click();}
 function compressImage(file,cb){const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const max=1200;let w=img.width,h=img.height;if(w>h&&w>max){h=h*max/w;w=max;}else if(h>max){w=w*max/h;h=max;}const cv=document.createElement('canvas');cv.width=Math.round(w);cv.height=Math.round(h);cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);const dataUrl=(function(){try{return cv.toDataURL('image/jpeg',0.72);}catch(e){return r.result;}})();if(cv.toBlob){cv.toBlob(b=>cb(dataUrl,b),'image/jpeg',0.72);}else{cb(dataUrl,null);}};img.onerror=()=>cb(r.result,null);img.src=r.result;};r.readAsDataURL(file);}
 
@@ -1868,10 +1954,10 @@ async function refreshRemindCard(){
   const sub=$('remindSub'),ctl=$('remindCtl'); if(!sub||!ctl)return;
   const st=await pushStatus();
   if(st==='unavailable'){
-    sub.textContent='Add Tend to your Home Screen to enable reminders (Share \u2192 Add to Home Screen on iPhone).';
+    sub.textContent='Add Cairn to your Home Screen to enable reminders (Share \u2192 Add to Home Screen on iPhone).';
     ctl.innerHTML='';
   } else if(st==='denied'){
-    sub.textContent='Notifications are blocked in your device settings. Re-enable them for Tend, then come back.';
+    sub.textContent='Notifications are blocked in your device settings. Re-enable them for Cairn, then come back.';
     ctl.innerHTML='';
   } else if(st==='on'){
     sub.textContent='On \u2014 you\u2019ll get a heads-up before hearings and appointments.';
@@ -1883,6 +1969,44 @@ async function refreshRemindCard(){
 }
 function pushConfigured(){ return VAPID_PUBLIC && VAPID_PUBLIC!=='PASTE_YOUR_VAPID_PUBLIC_KEY_HERE'; }
 function pushSupported(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+// Is the app running as an installed Home-Screen app (vs a browser tab)?
+function isStandalone(){
+  return (window.navigator.standalone===true) || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+}
+function isIOS(){
+  const ua=navigator.userAgent||'';
+  const iDevice=/iPad|iPhone|iPod/.test(ua);
+  // iPadOS 13+ reports as Mac; detect touch Macs too
+  const iPadOSMac=(/Macintosh/.test(ua) && 'ontouchend' in document);
+  return iDevice || iPadOSMac;
+}
+// Should we nudge this person to install for reminders?
+// Only when: on iOS, NOT already installed, push IS deployed on the server,
+// and they haven't dismissed it this session.
+let installNudgeDismissed=false;
+function shouldShowInstallNudge(){
+  return isIOS() && !isStandalone() && pushConfigured() && !installNudgeDismissed;
+}
+function installNudgeHTML(){
+  if(!shouldShowInstallNudge())return '';
+  return '<div class="card" data-action="show-install" style="cursor:pointer;margin-top:16px;border-color:'+C.gold+';background:rgba(200,160,85,.10)"><div class="row" style="align-items:flex-start;gap:11px">'
+    +'<span style="color:'+C.gold+';display:flex;margin-top:1px">'+ic('spark',18)+'</span>'
+    +'<div class="grow"><p style="font-weight:600;font-size:14.5px">Turn on reminders</p><p class="tiny" style="margin-top:2px;line-height:1.45;color:'+C.inkSoft+'">To get reminded about hearings and appointments, add Cairn to your Home Screen first. Tap to see how.</p></div>'
+    +'<button class="icon-btn" data-action="dismiss-install" style="margin-top:-2px">'+ic('x',15)+'</button></div></div>';
+}
+function installSheet(){
+  let h='<h2>Get reminders on your iPhone</h2><p class="glead">iPhone only sends reminders for apps saved to the Home Screen. It takes about 20 seconds \u2014 here\u2019s how.</p>';
+  const step=(n,t)=>'<div class="row" style="align-items:flex-start;gap:11px;padding:9px 0;border-top:1px solid var(--line)"><span style="flex:0 0 24px;width:24px;height:24px;border-radius:50%;background:'+C.sage+';color:'+C.bone+';font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">'+n+'</span><p style="font-size:14px;line-height:1.5">'+t+'</p></div>';
+  h+='<div style="margin-top:8px">';
+  h+=step('1','In Safari, tap the <b>Share</b> button \u2014 the square with an arrow pointing up, at the bottom (or top) of the screen.');
+  h+=step('2','Scroll down and tap <b>Add to Home Screen</b>.');
+  h+=step('3','Tap <b>Add</b> in the top corner. A Cairn icon appears on your Home Screen.');
+  h+=step('4','Open Cairn from that <b>new icon</b> (not Safari), then come back to <b>More \u2192 Settings</b> and tap <b>Turn on reminders</b>.');
+  h+='</div>';
+  h+='<div class="note" style="margin-top:14px">'+ic('spark',16)+'<div>This is an Apple requirement for all web apps \u2014 once it\u2019s on your Home Screen, reminders work just like any other app, even when Cairn is closed.</div></div>';
+  h+='<div class="sheet-actions"><button class="btn btn-primary btn-block" data-action="close">Got it</button></div>';
+  openSheet(h);
+}
 function urlB64ToUint8(base64){
   const pad='='.repeat((4-base64.length%4)%4);
   const b=(base64+pad).replace(/-/g,'+').replace(/_/g,'/');
@@ -1900,8 +2024,8 @@ async function pushStatus(){
   }catch(e){ return 'off'; }
 }
 async function enablePush(){
-  if(!pushSupported()){alert('This device or browser doesn\u2019t support reminders. On iPhone, add Tend to your Home Screen first (Share \u2192 Add to Home Screen), then try again.');return;}
-  if(!pushConfigured()){alert('Reminders aren\u2019t set up on this copy of Tend yet.');return;}
+  if(!pushSupported()){alert('This device or browser doesn\u2019t support reminders. On iPhone, add Cairn to your Home Screen first (Share \u2192 Add to Home Screen), then try again.');return;}
+  if(!pushConfigured()){alert('Reminders aren\u2019t set up on this copy of Cairn yet.');return;}
   try{
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){renderTab();return;}
@@ -2013,9 +2137,18 @@ async function saveVitalDoc(){
 }
 
 /* LEGAL & CASE */
-function caseModal(){
-  const h0=household||{};
-  let h='<h2>Case overview</h2><p class="glead">The case at a glance. All optional \u2014 fill in what you have. Hearings you schedule still live under Appointments; this is the case-level record.</p>';
+function caseModal(fromScan){
+  const h0base=household||{};
+  const sd=(fromScan&&scanCaseDraft)?scanCaseDraft:null;
+  const h0=sd?Object.assign({},h0base,{
+    case_number:sd.case_number||h0base.case_number,
+    court_name:sd.court_name||h0base.court_name,
+    judge_name:sd.judge_name||h0base.judge_name,
+    permanency_goal:sd.permanency_goal||h0base.permanency_goal,
+    next_hearing_date:sd.next_hearing_date||h0base.next_hearing_date
+  }):h0base;
+  if(sd)scanCaseDraft=null; // consumed
+  let h='<h2>Case overview</h2><p class="glead">'+(sd?'From your scan \u2014 check these and fill in the rest, then save.':'The case at a glance. All optional \u2014 fill in what you have. Hearings you schedule still live under Appointments; this is the case-level record.')+'</p>';
   h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Case number</span><input type="text" id="cs_num" value="'+esc(h0.case_number||'')+'"></label><label class="fld grow"><span>Case opened</span><input type="date" id="cs_opened" value="'+(h0.case_opened_date||'')+'"></label></div>';
   h+='<label class="fld"><span>Permanency goal</span><input type="text" id="cs_goal" placeholder="e.g. Reunification / Guardianship / Adoption" value="'+esc(h0.permanency_goal||'')+'"></label>';
   h+='<div class="row" style="gap:10px"><label class="fld grow"><span>Court</span><input type="text" id="cs_court" placeholder="e.g. Lawrence County" value="'+esc(h0.court_name||'')+'"></label><label class="fld grow"><span>Judge</span><input type="text" id="cs_judge" value="'+esc(h0.judge_name||'')+'"></label></div>';
@@ -2097,6 +2230,11 @@ document.addEventListener('click',e=>{
     case 'goto-team':UI.tab='team';renderTab();break;
     case 'refresh':softRefresh();break;
     case 'open-add':addChooser();break;
+    case 'show-install':installSheet();break;
+    case 'dismiss-install':installNudgeDismissed=true;renderTab();break;
+    case 'scan-doc':scanChooser();break;
+    case 'scan-pick':scanPick(t.getAttribute('data-type'));break;
+    case 'scan-manual':scanManual();break;
     case 'aria-filter':UI.ariaFilter=t.getAttribute('data-f');renderTab();break;
     case 'case-seg':UI.caseSeg=t.getAttribute('data-s');renderTab();break;
     case 'health-seg':UI.healthSeg=t.getAttribute('data-s');renderTab();break;
